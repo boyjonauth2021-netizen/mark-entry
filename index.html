@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mark Entry — B. Ramlallah SSS</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --primary:  #1a1a2e;
+    --accent:   #4f8ef7;
+    --success:  #27ae60;
+    --danger:   #e74c3c;
+    --bg:       #f4f6fb;
+    --card:     #ffffff;
+    --border:   #e0e4ef;
+    --text:     #1a1a2e;
+    --muted:    #7a7a9a;
+  }
+
+  html, body {
+    width: 100%;
+    min-height: 100%;
+    background: var(--bg);
+    font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    color: var(--text);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #app { width: 100%; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Login Screen ── */
+  #login-screen {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px 24px; text-align: center;
+    background: var(--primary);
+  }
+  .login-logo   { font-size: 64px; margin-bottom: 20px; }
+  .login-school { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .login-sub    { font-size: 15px; color: rgba(255,255,255,0.55); margin-bottom: 48px; line-height: 1.5; }
+  .btn-google {
+    display: flex; align-items: center; gap: 14px;
+    background: #fff; border: none; border-radius: 14px;
+    padding: 18px 32px; font-size: 18px; font-weight: 700;
+    color: var(--text); cursor: pointer; width: 100%; max-width: 340px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    touch-action: manipulation; justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-google:active { transform: scale(0.97); }
+  .btn-google img { width: 28px; height: 28px; }
+  .login-note { font-size: 13px; color: rgba(255,255,255,0.35); margin-top: 24px; }
+
+  /* ── Top Bar ── */
+  .topbar {
+    background: var(--primary); color: #fff;
+    padding: 20px 20px 14px; width: 100%;
+    box-shadow: 0 2px 12px rgba(26,26,46,0.2);
+  }
+  .topbar-row    { display: flex; align-items: center; justify-content: space-between; }
+  .topbar-title  { font-size: 22px; font-weight: 700; }
+  .topbar-sub    { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+  .topbar-crumb  { font-size: 13px; color: var(--accent); margin-top: 6px; font-weight: 600; min-height: 18px; }
+  .user-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3); object-fit: cover;
+    cursor: pointer;
+  }
+  .user-initial {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  }
+
+  /* ── Content ── */
+  .content { flex: 1; padding: 24px 16px 100px; width: 100%; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .section-label {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
+  }
+
+  /* ── Choice Cards ── */
+  .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+  .choice-card {
+    background: var(--card); border: 2.5px solid var(--border);
+    border-radius: 20px; padding: 28px 16px; text-align: center;
+    cursor: pointer; font-size: 32px; font-weight: 700; color: var(--text);
+    box-shadow: 0 2px 12px rgba(26,26,46,0.08);
+    touch-action: manipulation; user-select: none; transition: all 0.15s;
+  }
+  .choice-card .card-sub { font-size: 13px; font-weight: 500; opacity: 0.5; margin-top: 6px; }
+  .choice-card:active { background: var(--primary); border-color: var(--primary); color: #fff; transform: scale(0.97); }
+
+  /* ── Subject List ── */
+  .subject-list { display: flex; flex-direction: column; gap: 10px; }
+  .subject-item {
+    background: var(--card); border: 2px solid var(--border); border-radius: 16px;
+    padding: 20px 16px; display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; touch-action: manipulation;
+    box-shadow: 0 2px 8px rgba(26,26,46,0.06); transition: all 0.15s;
+  }
+  .subject-item:active { background: #eef2ff; transform: scale(0.99); }
+  .subject-name  { font-size: 18px; font-weight: 600; flex: 1; margin-right: 10px; }
+  .subject-type  { font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 30px; white-space: nowrap; }
+  .type-mark    { background: #e8f0fe; color: #1a56db; }
+  .type-pib     { background: #fef3c7; color: #92400e; }
+  .type-remarks { background: #f0fdf4; color: #166534; }
+
+  /* ── Back Button ── */
+  .btn-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: none; color: var(--accent);
+    font-size: 17px; font-weight: 600; cursor: pointer;
+    padding: 0; margin-bottom: 22px; touch-action: manipulation;
+  }
+
+  /* ── Mark Header ── */
+  .mark-header {
+    background: var(--card); border-radius: 16px; padding: 18px;
+    margin-bottom: 18px; border-left: 5px solid var(--accent);
+    box-shadow: 0 2px 8px rgba(26,26,46,0.07);
+  }
+  .mark-header-title { font-size: 20px; font-weight: 700; }
+  .mark-header-sub   { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Student Rows ── */
+  .student-list { display: flex; flex-direction: column; gap: 12px; }
+  .student-row {
+    background: var(--card); border-radius: 16px; padding: 16px;
+    border: 1.5px solid var(--border); box-shadow: 0 2px 8px rgba(26,26,46,0.06);
+  }
+  .student-name {
+    font-size: 16px; font-weight: 600; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .student-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; min-width: 30px;
+    background: var(--primary); color: #fff;
+    border-radius: 50%; font-size: 13px; font-weight: 700;
+  }
+
+  /* ── Mark Input ── */
+  .mark-input {
+    width: 100%; height: 62px; border: 2.5px solid var(--border);
+    border-radius: 12px; font-size: 28px; font-weight: 700;
+    text-align: center; color: var(--text); background: var(--bg);
+    outline: none; -webkit-appearance: none; appearance: none;
+    touch-action: manipulation; transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  .mark-input:focus  { border-color: var(--accent); background: #fff; }
+  .mark-input.filled { border-color: var(--success); background: #f0fdf4; }
+  .mark-input.invalid{ border-color: var(--danger);  background: #fff5f5; }
+
+  /* ── PIB Buttons ── */
+  .pib-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .pib-btn {
+    height: 58px; border: 2.5px solid var(--border); border-radius: 12px;
+    font-size: 15px; font-weight: 700; background: var(--bg);
+    cursor: pointer; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+    font-family: inherit;
+  }
+  .pib-btn:active     { transform: scale(0.95); }
+  .pib-btn.selected-p { background: #d4edda; border-color: #27ae60; color: #155724; }
+  .pib-btn.selected-i { background: #fff3cd; border-color: #f0ad4e; color: #856404; }
+  .pib-btn.selected-b { background: #f8d7da; border-color: #e74c3c; color: #721c24; }
+
+  /* ── Remarks ── */
+  .remarks-input {
+    width: 100%; min-height: 90px; border: 2.5px solid var(--border);
+    border-radius: 12px; font-size: 16px; padding: 12px 14px;
+    color: var(--text); background: var(--bg); outline: none;
+    resize: vertical; transition: border-color 0.15s; font-family: inherit;
+  }
+  .remarks-input:focus { border-color: var(--accent); background: #fff; }
+
+  /* ── Submit ── */
+  .submit-wrap {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, var(--bg) 75%, transparent);
+    padding: 16px 16px 24px;
+  }
+  .btn-submit {
+    width: 100%; height: 64px; background: var(--primary); color: #fff;
+    border: none; border-radius: 18px; font-size: 20px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 20px rgba(26,26,46,0.22);
+    touch-action: manipulation; transition: all 0.15s; font-family: inherit;
+  }
+  .btn-submit:active   { transform: scale(0.98); opacity: 0.9; }
+  .btn-submit:disabled { background: #b0b0c0; box-shadow: none; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: var(--primary); color: #fff;
+    padding: 14px 24px; border-radius: 50px;
+    font-size: 15px; font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease; z-index: 999; white-space: nowrap;
+  }
+  .toast.show    { transform: translateX(-50%) translateY(0); }
+  .toast.success { background: #1a7a4a; }
+  .toast.error   { background: var(--danger); }
+
+  /* ── Loading ── */
+  .loading {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 60px 0; gap: 16px;
+    color: var(--muted); font-size: 16px; font-weight: 500;
+  }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 4px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Success ── */
+  .success-screen { text-align: center; padding: 60px 24px; }
+  .success-icon   { font-size: 72px; margin-bottom: 18px; }
+  .success-title  { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+  .success-sub    { font-size: 16px; color: var(--muted); margin-bottom: 36px; line-height: 1.6; }
+  .btn-again {
+    width: 100%; height: 62px; background: var(--accent); color: #fff;
+    border: none; border-radius: 18px; font-size: 18px; font-weight: 700;
+    cursor: pointer; margin-bottom: 12px; touch-action: manipulation;
+    font-family: inherit;
+  }
+  .btn-home {
+    width: 100%; height: 62px; background: var(--card); color: var(--text);
+    border: 2.5px solid var(--border); border-radius: 18px;
+    font-size: 18px; font-weight: 700; cursor: pointer;
+    touch-action: manipulation; font-family: inherit;
+  }
+
+  /* ── User menu ── */
+  .user-menu {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); z-index: 200; display: none;
+    align-items: flex-end;
+  }
+  .user-menu.open { display: flex; }
+  .user-menu-card {
+    background: var(--card); width: 100%; border-radius: 24px 24px 0 0;
+    padding: 32px 24px 40px;
+  }
+  .user-menu-name  { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .user-menu-email { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+  .btn-signout {
+    width: 100%; height: 58px; background: #fff5f5; color: var(--danger);
+    border: 2px solid #ffd0d0; border-radius: 14px;
+    font-size: 17px; font-weight: 700; cursor: pointer;
+    touch-action: manipulation; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Login Screen ── -->
+<div id="login-screen">
+  <div class="login-logo">🏫</div>
+  <div class="login-school">B. Ramlallah State Secondary School</div>
+  <div class="login-sub">Mark Entry System<br>Sign in with your school Google account</div>
+  <button class="btn-google" onclick="signIn()">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+    Sign in with Google
+  </button>
+  <div class="login-note">Only authorised school accounts can access this system</div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="main-app" style="display:none; flex-direction:column; min-height:100vh;">
+
+  <div class="topbar">
+    <div class="topbar-row">
+      <div>
+        <div class="topbar-title">📝 Mark Entry</div>
+        <div class="topbar-sub">B. Ramlallah State Secondary School</div>
+      </div>
+      <div class="user-initial" id="user-avatar" onclick="openUserMenu()">?</div>
+    </div>
+    <div class="topbar-crumb" id="breadcrumb">&nbsp;</div>
+  </div>
+
+  <div class="content">
+
+    <!-- Screen 1: Grade -->
+    <div class="screen active" id="screen-grade">
+      <div class="section-label">Select Grade</div>
+      <div class="choice-grid" id="grade-grid"></div>
+    </div>
+
+    <!-- Screen 2: Stream -->
+    <div class="screen" id="screen-stream">
+      <button class="btn-back" onclick="goTo('grade')">← Back</button>
+      <div class="section-label">Select Stream</div>
+      <div class="choice-grid" id="stream-grid"></div>
+    </div>
+
+    <!-- Screen 3: Subject -->
+    <div class="screen" id="screen-subject">
+      <button class="btn-back" onclick="goTo('stream')">← Back</button>
+      <div class="section-label">Select Subject</div>
+      <div class="subject-list" id="subject-list"></div>
+    </div>
+
+    <!-- Screen 4: Marks -->
+    <div class="screen" id="screen-marks">
+      <button class="btn-back" onclick="goTo('subject')">← Back</button>
+      <div class="mark-header">
+        <div class="mark-header-title" id="marks-title"></div>
+        <div class="mark-header-sub"   id="marks-sub"></div>
+      </div>
+      <div id="student-list-container"></div>
+      <div style="height:90px"></div><!-- spacer for fixed button -->
+    </div>
+
+    <!-- Screen 5: Success -->
+    <div class="screen" id="screen-success">
+      <div class="success-screen">
+        <div class="success-icon">✅</div>
+        <div class="success-title">Marks Saved!</div>
+        <div class="success-sub" id="success-sub"></div>
+        <button class="btn-again" onclick="goTo('subject')">Enter Another Subject</button>
+        <button class="btn-home"  onclick="goTo('grade')">Back to Home</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Fixed Submit Button -->
+  <div class="submit-wrap" id="submit-wrap" style="display:none">
+    <button class="btn-submit" id="btn-submit" onclick="submitMarks()">✓ Save Marks</button>
+  </div>
+
+</div>
+
+<!-- User Menu -->
+<div class="user-menu" id="user-menu" onclick="closeUserMenu()">
+  <div class="user-menu-card" onclick="event.stopPropagation()">
+    <div class="user-menu-name"  id="menu-name"></div>
+    <div class="user-menu-email" id="menu-email"></div>
+    <button class="btn-signout" onclick="signOut()">Sign Out</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<script>
+// ── Config ───────────────────────────────────────────────────
+var CLIENT_ID   = '920543301524-69idp58am0pr3fnqf4etlghehirakp17.apps.googleusercontent.com';
+var SHEET_ID    = '1dARVrj617EkYyEPjC3u5LANeZcAxkxMfrM9c6xwbfoI';
+var SCOPES      = 'https://www.googleapis.com/auth/spreadsheets';
+var API_KEY     = ''; // optional, not needed for OAuth flow
+var accessToken = null;
+
+var CLASS_CONFIG = {
+  'G7': ['RED', 'BLUE', 'YELLOW'],
+  'G8': ['RED', 'BLUE', 'YELLOW'],
+};
+
+var SUBJECTS = [
+  { name: 'English',                 code: 'SUBJ15', type: 'mark' },
+  { name: 'French',                  code: 'SUBJ20', type: 'mark' },
+  { name: 'Mathematics',             code: 'SUBJ32', type: 'mark' },
+  { name: 'Biology',                 code: 'SUBJ5',  type: 'mark' },
+  { name: 'Chemistry',               code: 'SUBJ8',  type: 'mark' },
+  { name: 'Physics',                 code: 'SUBJ37', type: 'mark' },
+  { name: 'Science',                 code: 'SUBJ39', type: 'mark' },
+  { name: 'Design & Technology',     code: 'SUBJ12', type: 'mark' },
+  { name: 'Food Studies',            code: 'SUBJ19', type: 'mark' },
+  { name: 'Technology Studies',      code: 'SUBJ43', type: 'mark' },
+  { name: 'Arabic',                  code: 'SUBJ3',  type: 'mark' },
+  { name: 'Art & Design',            code: 'SUBJ4',  type: 'mark' },
+  { name: 'BEE',                     code: 'SUBJ7',  type: 'mark' },
+  { name: 'Hindi',                   code: 'SUBJ23', type: 'mark' },
+  { name: 'ICT',                     code: 'SUBJ25', type: 'mark' },
+  { name: 'Kreol Morisien',          code: 'SUBJ27', type: 'mark' },
+  { name: 'Social & Modern Studies', code: 'SUBJ40', type: 'mark' },
+  { name: 'Telugu',                  code: 'SUBJ44', type: 'mark' },
+  { name: 'Urdu',                    code: 'SUBJ46', type: 'mark' },
+  { name: 'Tamil',                   code: 'SUBJ42', type: 'mark' },
+  { name: 'Life Skills & Values',    code: 'SUBJ28', type: 'pib'  },
+  { name: 'Performing Arts',         code: 'SUBJ35', type: 'pib'  },
+  { name: 'Physical Education',      code: 'SUBJ36', type: 'pib'  },
+  { name: 'Form Master Remarks',     code: 'REMARKS',type: 'remarks' },
+];
+
+// ── State ────────────────────────────────────────────────────
+var state = { grade: null, stream: null, subject: null, students: [], sheetData: null };
+var tokenClient;
+
+// ── Auth ─────────────────────────────────────────────────────
+window.onload = function() {
+  // Check if already signed in
+  var saved = sessionStorage.getItem('userInfo');
+  if (saved && sessionStorage.getItem('accessToken')) {
+    accessToken = sessionStorage.getItem('accessToken');
+    showApp(JSON.parse(saved));
+  }
+};
+
+function signIn() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES + ' https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    callback: function(response) {
+      if (response.error) { showToast('Sign in failed', 'error'); return; }
+      accessToken = response.access_token;
+      sessionStorage.setItem('accessToken', accessToken);
+      // Get user info
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(user) {
+        sessionStorage.setItem('userInfo', JSON.stringify(user));
+        showApp(user);
+      });
+    }
+  });
+  tokenClient.requestAccessToken();
+}
+
+function showApp(user) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'flex';
+
+  // Set avatar
+  var av = document.getElementById('user-avatar');
+  var initial = (user.name || user.email || '?')[0].toUpperCase();
+  av.textContent = initial;
+
+  // Set menu
+  document.getElementById('menu-name').textContent  = user.name  || '';
+  document.getElementById('menu-email').textContent = user.email || '';
+
+  renderGrades();
+}
+
+function signOut() {
+  sessionStorage.clear();
+  accessToken = null;
+  closeUserMenu();
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function openUserMenu()  { document.getElementById('user-menu').classList.add('open'); }
+function closeUserMenu() { document.getElementById('user-menu').classList.remove('open'); }
+
+// ── Navigation ────────────────────────────────────────────────
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('screen-' + screen).classList.add('active');
+  document.getElementById('submit-wrap').style.display = screen === 'marks' ? 'block' : 'none';
+  window.scrollTo(0, 0);
+  updateBreadcrumb();
+}
+
+function updateBreadcrumb() {
+  var crumb = '';
+  if (state.grade)   crumb += state.grade;
+  if (state.stream)  crumb += ' › ' + state.stream;
+  if (state.subject) crumb += ' › ' + state.subject.name;
+  document.getElementById('breadcrumb').textContent = crumb || '\u00a0';
+}
+
+// ── Screen 1: Grades ──────────────────────────────────────────
+function renderGrades() {
+  var grid = document.getElementById('grade-grid');
+  grid.innerHTML = '';
+  Object.keys(CLASS_CONFIG).forEach(function(g) {
+    var card = document.createElement('div');
+    card.className = 'choice-card';
+    card.innerHTML = g + '<div class="card-sub">Grade ' + g.replace('G','') + '</div>';
+    card.onclick = function(){ selectGrade(g); };
+    grid.appendChild(card);
+  });
+}
+
+function selectGrade(grade) {
+  state.grade = grade; state.stream = null; state.subject = null;
+  updateBreadcrumb();
+  renderStreams(); goTo('stream');
+}
+
+// ── Screen 2: Streams ─────────────────────────────────────────
+function renderStreams() {
+  var grid = document.getElementById('stream-grid');
+  grid.innerHTML = '';
+  var colors = { RED:'#e74c3c', BLUE:'#3498db', YELLOW:'#f39c12' };
+  CLASS_CONFIG[state.grade].forEach(function(s) {
+    var card = document.createElement('div');
+    card.className = 'choice-card';
+    card.style.borderColor = colors[s] || '#ccc';
+    card.textContent = s;
+    card.onclick = function(){ selectStream(s); };
+    grid.appendChild(card);
+  });
+}
+
+function selectStream(stream) {
+  state.stream = stream; state.subject = null;
+  updateBreadcrumb(); renderSubjects(); goTo('subject');
+}
+
+// ── Screen 3: Subjects ────────────────────────────────────────
+function renderSubjects() {
+  var list = document.getElementById('subject-list');
+  list.innerHTML = '';
+  SUBJECTS.forEach(function(subj) {
+    var item = document.createElement('div');
+    item.className = 'subject-item';
+    var typeLabel = subj.type==='mark' ? 'Mark' : subj.type==='pib' ? 'P / I / B' : 'Remarks';
+    item.innerHTML =
+      '<span class="subject-name">' + subj.name + '</span>' +
+      '<span class="subject-type type-' + subj.type + '">' + typeLabel + '</span>';
+    item.onclick = function(){ selectSubject(subj); };
+    list.appendChild(item);
+  });
+}
+
+function selectSubject(subj) {
+  state.subject = subj; updateBreadcrumb(); loadMarks(); goTo('marks');
+}
+
+// ── Screen 4: Load Marks ──────────────────────────────────────
+function loadMarks() {
+  var container = document.getElementById('student-list-container');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading students...</div>';
+  document.getElementById('marks-title').textContent = state.subject.name;
+  document.getElementById('marks-sub').textContent   = state.grade + ' ' + state.stream;
+  document.getElementById('btn-submit').disabled = true;
+
+  var tabName  = state.grade + ' ' + state.stream;
+  var range    = encodeURIComponent(tabName + '!A1:AJ300');
+  var url      = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID +
+                 '/values/' + range;
+
+  fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (data.error) { showToast('Error: ' + data.error.message, 'error'); return; }
+    var rows = data.values || [];
+    parseAndRender(rows);
+  })
+  .catch(function(){ showToast('Failed to load. Check connection.', 'error'); });
+}
+
+function parseAndRender(rows) {
+  if (rows.length < 3) { showToast('Sheet data not found', 'error'); return; }
+
+  var codeRow  = rows[2]; // Row 3 = codes
+  var subjColMap = {};
+  codeRow.forEach(function(code, i){ if(code) subjColMap[code] = i; });
+
+  var nameCol = subjColMap['NAME'];
+  var subjCol = subjColMap[state.subject.code];
+
+  var students = [];
+  for (var i = 3; i < rows.length; i++) {
+    var name = (rows[i][nameCol] || '').toString().trim();
+    if (!name) continue;
+    var existing = subjCol !== undefined ? (rows[i][subjCol] || '') : '';
+    students.push({ name: name, rowIndex: i, existing: existing.toString() });
+  }
+
+  state.students   = students;
+  state.sheetData  = { codeRow: codeRow, subjCol: subjCol };
+
+  document.getElementById('marks-sub').textContent =
+    state.grade + ' ' + state.stream + ' · ' + students.length + ' students';
+
+  renderStudentRows(students);
+  document.getElementById('btn-submit').disabled = false;
+}
+
+function renderStudentRows(students) {
+  var container = document.getElementById('student-list-container');
+  container.innerHTML = '';
+  var list = document.createElement('div');
+  list.className = 'student-list';
+
+  students.forEach(function(student, idx) {
+    var existing = student.existing || '';
+    var row = document.createElement('div');
+    row.className = 'student-row';
+
+    var inputHtml = '';
+    if (state.subject.type === 'mark') {
+      inputHtml = '<input class="mark-input ' + (existing ? 'filled' : '') + '"' +
+        ' type="number" inputmode="numeric" min="0" max="100"' +
+        ' placeholder="—" value="' + existing + '"' +
+        ' oninput="onMarkInput(this)">';
+    } else if (state.subject.type === 'pib') {
+      var selP = existing==='P' ? 'selected-p' : '';
+      var selI = existing==='I' ? 'selected-i' : '';
+      var selB = existing==='B' ? 'selected-b' : '';
+      inputHtml = '<div class="pib-buttons">' +
+        '<button class="pib-btn ' + selP + '" data-val="P" onclick="selectPIB(this)">Proficient</button>' +
+        '<button class="pib-btn ' + selI + '" data-val="I" onclick="selectPIB(this)">Intermediate</button>' +
+        '<button class="pib-btn ' + selB + '" data-val="B" onclick="selectPIB(this)">Basic</button>' +
+        '</div>';
+    } else {
+      inputHtml = '<textarea class="remarks-input" placeholder="Enter remarks...">' + existing + '</textarea>';
+    }
+
+    row.innerHTML =
+      '<div class="student-name"><span class="student-num">' + (idx+1) + '</span>' + student.name + '</div>' +
+      inputHtml;
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+}
+
+function onMarkInput(input) {
+  var val = parseInt(input.value);
+  input.classList.remove('filled','invalid');
+  if (input.value === '') return;
+  if (isNaN(val) || val < 0 || val > 100) input.classList.add('invalid');
+  else input.classList.add('filled');
+}
+
+function selectPIB(btn) {
+  var group = btn.parentElement;
+  group.querySelectorAll('.pib-btn').forEach(function(b){
+    b.classList.remove('selected-p','selected-i','selected-b');
+  });
+  btn.classList.add('selected-' + btn.dataset.val.toLowerCase());
+}
+
+// ── Submit ────────────────────────────────────────────────────
+function submitMarks() {
+  var btn = document.getElementById('btn-submit');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  var subj    = state.subject;
+  var subjCol = state.sheetData.subjCol;
+  var colLetter = colToLetter(subjCol);
+  var data    = [];
+  var updates = [];
+
+  if (subj.type === 'mark') {
+    document.querySelectorAll('.mark-input').forEach(function(input, i) {
+      var val = input.value.trim();
+      var sheetRow = state.students[i].rowIndex + 1; // 1-indexed
+      updates.push({ range: state.grade+' '+state.stream+'!'+colLetter+sheetRow, values: [[val==='' ? '' : parseInt(val)]] });
+    });
+  } else if (subj.type === 'pib') {
+    document.querySelectorAll('.pib-buttons').forEach(function(group, i) {
+      var sel = group.querySelector('[class*="selected-"]');
+      var val = sel ? sel.dataset.val : '';
+      var sheetRow = state.students[i].rowIndex + 1;
+      updates.push({ range: state.grade+' '+state.stream+'!'+colLetter+sheetRow, values: [[val]] });
+    });
+  } else {
+    document.querySelectorAll('.remarks-input').forEach(function(ta, i) {
+      var sheetRow = state.students[i].rowIndex + 1;
+      updates.push({ range: state.grade+' '+state.stream+'!'+colLetter+sheetRow, values: [[ta.value.trim()]] });
+    });
+  }
+
+  // Batch update
+  var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values:batchUpdate';
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ valueInputOption: 'RAW', data: updates })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(result) {
+    btn.disabled = false; btn.textContent = '✓ Save Marks';
+    if (result.error) { showToast('Error: ' + result.error.message, 'error'); return; }
+    document.getElementById('success-sub').textContent =
+      subj.name + ' marks for ' + state.grade + ' ' + state.stream + ' saved successfully.';
+    goTo('success');
+  })
+  .catch(function(){
+    btn.disabled = false; btn.textContent = '✓ Save Marks';
+    showToast('Failed to save. Try again.', 'error');
+  });
+}
+
+function colToLetter(col) {
+  var letter = '';
+  col = col + 1; // 1-indexed
+  while (col > 0) {
+    var rem = (col - 1) % 26;
+    letter = String.fromCharCode(65 + rem) + letter;
+    col = Math.floor((col - 1) / 26);
+  }
+  return letter;
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg, type) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast show ' + (type||'');
+  setTimeout(function(){ toast.className = 'toast'; }, 3000);
+}
+</script>
+</body>
+</html>
