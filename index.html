@@ -412,9 +412,9 @@ var tokenClient;
 // ── Auth ─────────────────────────────────────────────────────
 window.onload = function() {
   // Check if already signed in
-  var saved = sessionStorage.getItem('userInfo');
-  if (saved && sessionStorage.getItem('accessToken')) {
-    accessToken = sessionStorage.getItem('accessToken');
+  var saved = localStorage.getItem('userInfo');
+  if (saved && localStorage.getItem('accessToken')) {
+    accessToken = localStorage.getItem('accessToken');
     showApp(JSON.parse(saved));
   }
 };
@@ -426,14 +426,14 @@ function signIn() {
     callback: function(response) {
       if (response.error) { showToast('Sign in failed', 'error'); return; }
       accessToken = response.access_token;
-      sessionStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('accessToken', accessToken);
       // Get user info
       fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { 'Authorization': 'Bearer ' + accessToken }
       })
       .then(function(r){ return r.json(); })
       .then(function(user) {
-        sessionStorage.setItem('userInfo', JSON.stringify(user));
+        localStorage.setItem('userInfo', JSON.stringify(user));
         showApp(user);
       });
     }
@@ -458,7 +458,7 @@ function showApp(user) {
 }
 
 function signOut() {
-  sessionStorage.clear();
+  localStorage.clear();
   accessToken = null;
   closeUserMenu();
   document.getElementById('main-app').style.display = 'none';
