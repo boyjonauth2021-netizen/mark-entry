@@ -368,9 +368,11 @@
 <script>
 // ── Config ───────────────────────────────────────────────────
 var CLIENT_ID   = '920543301524-69idp58am0pr3fnqf4etlghehirakp17.apps.googleusercontent.com';
-var SHEET_ID    = '1dARVrj617EkYyEPjC3u5LANeZcAxkxMfrM9c6xwbfoI';
-var SCOPES      = 'https://www.googleapis.com/auth/spreadsheets';
-var API_KEY     = ''; // optional, not needed for OAuth flow
+
+var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxHzWuSWKWe375FxrWiqvZ74xavutbvWXHBZD9jZ7xwNHcGN-tD51OAQBasKjC_tFOnaA/exec';
+
+// Only identity scopes — no spreadsheet access requested from the user
+var SCOPES      = 'openid email profile';
 var accessToken = null;
 
 var CLASS_CONFIG = {
@@ -412,28 +414,31 @@ var tokenClient;
 // ── Auth ─────────────────────────────────────────────────────
 window.onload = function() {
   // Check if already signed in
-  var saved = localStorage.getItem('userInfo');
-  if (saved && localStorage.getItem('accessToken')) {
-    accessToken = localStorage.getItem('accessToken');
+  var saved = sessionStorage.getItem('userInfo');
+  if (saved && sessionStorage.getItem('accessToken')) {
+    accessToken = sessionStorage.getItem('accessToken');
     showApp(JSON.parse(saved));
   }
 };
 
 function signIn() {
+  if (!SCRIPT_URL) {
+    showToast('SCRIPT_URL not configured — see google-apps-script.gs', 'error');
+    return;
+  }
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
-    scope: SCOPES + ' https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    scope: SCOPES,
     callback: function(response) {
       if (response.error) { showToast('Sign in failed', 'error'); return; }
       accessToken = response.access_token;
-      localStorage.setItem('accessToken', accessToken);
-      // Get user info
+      sessionStorage.setItem('accessToken', accessToken);
       fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { 'Authorization': 'Bearer ' + accessToken }
       })
       .then(function(r){ return r.json(); })
       .then(function(user) {
-        localStorage.setItem('userInfo', JSON.stringify(user));
+        sessionStorage.setItem('userInfo', JSON.stringify(user));
         showApp(user);
       });
     }
@@ -458,7 +463,7 @@ function showApp(user) {
 }
 
 function signOut() {
-  localStorage.clear();
+  sessionStorage.clear();
   accessToken = null;
   closeUserMenu();
   document.getElementById('main-app').style.display = 'none';
@@ -552,17 +557,16 @@ function loadMarks() {
   document.getElementById('marks-sub').textContent   = state.grade + ' ' + state.stream;
   document.getElementById('btn-submit').disabled = true;
 
-  var tabName  = state.grade + ' ' + state.stream;
-  var range    = encodeURIComponent(tabName + '!A1:AJ300');
-  var url      = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID +
-                 '/values/' + range;
+  var tabName = state.grade + ' ' + state.stream;
 
-  fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } })
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'read', token: accessToken, tab: tabName })
+  })
   .then(function(r){ return r.json(); })
   .then(function(data) {
-    if (data.error) { showToast('Error: ' + data.error.message, 'error'); return; }
-    var rows = data.values || [];
-    parseAndRender(rows);
+    if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
+    parseAndRender(data.values || []);
   })
   .catch(function(){ showToast('Failed to load. Check connection.', 'error'); });
 }
@@ -655,45 +659,38 @@ function submitMarks() {
   btn.disabled = true; btn.textContent = 'Saving...';
 
   var subj    = state.subject;
-  var subjCol = state.sheetData.subjCol;
-  var colLetter = colToLetter(subjCol);
-  var data    = [];
+  var subjCol = state.sheetData.subjCol; // 0-indexed → Apps Script needs 1-indexed
+  var col1    = subjCol + 1;
   var updates = [];
+  var tabName = state.grade + ' ' + state.stream;
 
   if (subj.type === 'mark') {
     document.querySelectorAll('.mark-input').forEach(function(input, i) {
-      var val = input.value.trim();
-      var sheetRow = state.students[i].rowIndex + 1; // 1-indexed
-      updates.push({ range: state.grade+' '+state.stream+'!'+colLetter+sheetRow, values: [[val==='' ? '' : parseInt(val)]] });
+      var raw = input.value.trim();
+      updates.push({ row: state.students[i].rowIndex + 1, col: col1,
+                     value: raw === '' ? '' : parseInt(raw) });
     });
   } else if (subj.type === 'pib') {
     document.querySelectorAll('.pib-buttons').forEach(function(group, i) {
       var sel = group.querySelector('[class*="selected-"]');
-      var val = sel ? sel.dataset.val : '';
-      var sheetRow = state.students[i].rowIndex + 1;
-      updates.push({ range: state.grade+' '+state.stream+'!'+colLetter+sheetRow, values: [[val]] });
+      updates.push({ row: state.students[i].rowIndex + 1, col: col1,
+                     value: sel ? sel.dataset.val : '' });
     });
   } else {
     document.querySelectorAll('.remarks-input').forEach(function(ta, i) {
-      var sheetRow = state.students[i].rowIndex + 1;
-      updates.push({ range: state.grade+' '+state.stream+'!'+colLetter+sheetRow, values: [[ta.value.trim()]] });
+      updates.push({ row: state.students[i].rowIndex + 1, col: col1,
+                     value: ta.value.trim() });
     });
   }
 
-  // Batch update
-  var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values:batchUpdate';
-  fetch(url, {
+  fetch(SCRIPT_URL, {
     method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + accessToken,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ valueInputOption: 'RAW', data: updates })
+    body: JSON.stringify({ action: 'write', token: accessToken, tab: tabName, updates: updates })
   })
   .then(function(r){ return r.json(); })
   .then(function(result) {
     btn.disabled = false; btn.textContent = '✓ Save Marks';
-    if (result.error) { showToast('Error: ' + result.error.message, 'error'); return; }
+    if (result.error) { showToast('Error: ' + result.error, 'error'); return; }
     document.getElementById('success-sub').textContent =
       subj.name + ' marks for ' + state.grade + ' ' + state.stream + ' saved successfully.';
     goTo('success');
@@ -702,17 +699,6 @@ function submitMarks() {
     btn.disabled = false; btn.textContent = '✓ Save Marks';
     showToast('Failed to save. Try again.', 'error');
   });
-}
-
-function colToLetter(col) {
-  var letter = '';
-  col = col + 1; // 1-indexed
-  while (col > 0) {
-    var rem = (col - 1) % 26;
-    letter = String.fromCharCode(65 + rem) + letter;
-    col = Math.floor((col - 1) / 26);
-  }
-  return letter;
 }
 
 // ── Toast ─────────────────────────────────────────────────────
