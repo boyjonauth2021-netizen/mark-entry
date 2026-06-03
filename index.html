@@ -369,7 +369,7 @@
 // ── Config ───────────────────────────────────────────────────
 var CLIENT_ID   = '920543301524-69idp58am0pr3fnqf4etlghehirakp17.apps.googleusercontent.com';
 
-var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbyWZvP50cYdJrZ47RF_vGwv0oti7qeOTSrZDOKyVEiCVQ4O0XOaoqXAv5bZfwuReOyhXg/exec';
+var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxHzWuSWKWe375FxrWiqvZ74xavutbvWXHBZD9jZ7xwNHcGN-tD51OAQBasKjC_tFOnaA/exec';
 
 // Only identity scopes — no spreadsheet access requested from the user
 var SCOPES      = 'openid email profile';
@@ -651,22 +651,69 @@ function loadMarks() {
   .catch(function(){ showToast('Failed to load. Check connection.', 'error'); });
 }
 
+function findNameColumn(codeRow, subjColMap) {
+  if (subjColMap.NAME !== undefined) return subjColMap.NAME;
+  if (subjColMap.name !== undefined) return subjColMap.name;
+  for (var i = 0; i < codeRow.length; i++) {
+    if (codeRow[i] && String(codeRow[i]).trim().toLowerCase() === 'name') return i;
+  }
+  return undefined;
+}
+
+// 0 = student takes this subject (show entry). Empty = does not take subject.
+function subjectCellMeta(raw) {
+  if (raw === null || raw === undefined) return { active: false };
+  var s = String(raw).trim();
+  if (s === '') return { active: false };
+  if (s === '0' || Number(s) === 0) {
+    return { active: true, placeholder: '—', sheetValue: '0' };
+  }
+  return { active: true, placeholder: s, sheetValue: s };
+}
+
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
 function parseAndRender(rows) {
   if (rows.length < 3) { showToast('Sheet data not found', 'error'); return; }
 
   var codeRow  = rows[2]; // Row 3 = codes
   var subjColMap = {};
-  codeRow.forEach(function(code, i){ if(code) subjColMap[code] = i; });
+  codeRow.forEach(function(code, i) {
+    if (code) subjColMap[String(code).trim()] = i;
+  });
 
-  var nameCol = subjColMap['NAME'];
+  var nameCol = findNameColumn(codeRow, subjColMap);
+  if (nameCol === undefined) {
+    showToast('NAME column not found in sheet', 'error');
+    return;
+  }
+
   var subjCol = subjColMap[state.subject.code];
+  if (subjCol === undefined) {
+    showToast('Subject column not found: ' + state.subject.code, 'error');
+    return;
+  }
 
   var students = [];
   for (var i = 3; i < rows.length; i++) {
     var name = (rows[i][nameCol] || '').toString().trim();
     if (!name) continue;
-    var existing = subjCol !== undefined ? (rows[i][subjCol] || '') : '';
-    students.push({ name: name, rowIndex: i, existing: existing.toString() });
+
+    var cellRaw = rows[i][subjCol];
+    var meta = subjectCellMeta(cellRaw);
+    if (!meta.active) continue;
+
+    students.push({
+      name: name,
+      rowIndex: i,
+      placeholder: meta.placeholder,
+      sheetValue: meta.sheetValue
+    });
   }
 
   state.students   = students;
@@ -676,7 +723,10 @@ function parseAndRender(rows) {
     classDisplayName() + ' · ' + students.length + ' students';
 
   renderStudentRows(students);
-  document.getElementById('btn-submit').disabled = false;
+  document.getElementById('btn-submit').disabled = students.length > 0;
+  if (students.length === 0) {
+    showToast('No students take this subject in this class', 'error');
+  }
 }
 
 function renderStudentRows(students) {
@@ -686,27 +736,33 @@ function renderStudentRows(students) {
   list.className = 'student-list';
 
   students.forEach(function(student, idx) {
-    var existing = student.existing || '';
     var row = document.createElement('div');
     row.className = 'student-row';
 
     var inputHtml = '';
     if (state.subject.type === 'mark') {
-      inputHtml = '<input class="mark-input ' + (existing ? 'filled' : '') + '"' +
+      var ph = escapeAttr(student.placeholder);
+      inputHtml = '<input class="mark-input"' +
         ' type="number" inputmode="numeric" min="0" max="100"' +
-        ' placeholder="—" value="' + existing + '"' +
+        ' placeholder="' + ph + '" value=""' +
+        ' data-sheet-value="' + escapeAttr(student.sheetValue) + '"' +
+        ' data-touched="false"' +
         ' oninput="onMarkInput(this)">';
     } else if (state.subject.type === 'pib') {
-      var selP = existing==='P' ? 'selected-p' : '';
-      var selI = existing==='I' ? 'selected-i' : '';
-      var selB = existing==='B' ? 'selected-b' : '';
-      inputHtml = '<div class="pib-buttons">' +
+      var sv = student.sheetValue;
+      var selP = sv==='P' ? 'selected-p' : '';
+      var selI = sv==='I' ? 'selected-i' : '';
+      var selB = sv==='B' ? 'selected-b' : '';
+      inputHtml = '<div class="pib-buttons" data-sheet-value="' + escapeAttr(sv) + '" data-touched="false">' +
         '<button class="pib-btn ' + selP + '" data-val="P" onclick="selectPIB(this)">Proficient</button>' +
         '<button class="pib-btn ' + selI + '" data-val="I" onclick="selectPIB(this)">Intermediate</button>' +
         '<button class="pib-btn ' + selB + '" data-val="B" onclick="selectPIB(this)">Basic</button>' +
         '</div>';
     } else {
-      inputHtml = '<textarea class="remarks-input" placeholder="Enter remarks...">' + existing + '</textarea>';
+      var rph = student.placeholder === '—' ? 'Enter remarks...' : student.placeholder;
+      inputHtml = '<textarea class="remarks-input" placeholder="' + escapeAttr(rph) + '"' +
+        ' data-sheet-value="' + escapeAttr(student.sheetValue) + '" data-touched="false"' +
+        ' oninput="this.dataset.touched=\'true\'"></textarea>';
     }
 
     row.innerHTML =
@@ -718,8 +774,9 @@ function renderStudentRows(students) {
 }
 
 function onMarkInput(input) {
-  var val = parseInt(input.value);
-  input.classList.remove('filled','invalid');
+  input.dataset.touched = 'true';
+  var val = parseInt(input.value, 10);
+  input.classList.remove('filled', 'invalid');
   if (input.value === '') return;
   if (isNaN(val) || val < 0 || val > 100) input.classList.add('invalid');
   else input.classList.add('filled');
@@ -727,10 +784,20 @@ function onMarkInput(input) {
 
 function selectPIB(btn) {
   var group = btn.parentElement;
+  group.dataset.touched = 'true';
   group.querySelectorAll('.pib-btn').forEach(function(b){
     b.classList.remove('selected-p','selected-i','selected-b');
   });
   btn.classList.add('selected-' + btn.dataset.val.toLowerCase());
+}
+
+function markValueToSave(input) {
+  var raw = input.value.trim();
+  if (raw !== '') {
+    var n = parseInt(raw, 10);
+    return isNaN(n) ? '' : n;
+  }
+  return input.dataset.sheetValue === '0' ? 0 : '';
 }
 
 // ── Submit ────────────────────────────────────────────────────
@@ -744,21 +811,34 @@ function submitMarks() {
   var updates = [];
   if (subj.type === 'mark') {
     document.querySelectorAll('.mark-input').forEach(function(input, i) {
-      var raw = input.value.trim();
-      updates.push({ row: state.students[i].rowIndex + 1, col: col1,
-                     value: raw === '' ? '' : parseInt(raw) });
+      if (input.dataset.touched !== 'true') return;
+      updates.push({
+        row: state.students[i].rowIndex + 1,
+        col: col1,
+        value: markValueToSave(input)
+      });
     });
   } else if (subj.type === 'pib') {
     document.querySelectorAll('.pib-buttons').forEach(function(group, i) {
+      if (group.dataset.touched !== 'true') return;
       var sel = group.querySelector('[class*="selected-"]');
-      updates.push({ row: state.students[i].rowIndex + 1, col: col1,
-                     value: sel ? sel.dataset.val : '' });
+      var val = sel ? sel.dataset.val : (group.dataset.sheetValue === '0' ? 0 : '');
+      updates.push({ row: state.students[i].rowIndex + 1, col: col1, value: val });
     });
   } else {
     document.querySelectorAll('.remarks-input').forEach(function(ta, i) {
-      updates.push({ row: state.students[i].rowIndex + 1, col: col1,
-                     value: ta.value.trim() });
+      if (ta.dataset.touched !== 'true') return;
+      var val = ta.value.trim();
+      if (val === '' && ta.dataset.sheetValue === '0') val = '';
+      updates.push({ row: state.students[i].rowIndex + 1, col: col1, value: val });
     });
+  }
+
+  if (updates.length === 0) {
+    btn.disabled = false;
+    btn.textContent = '✓ Save Marks';
+    showToast('No changes to save', 'error');
+    return;
   }
 
   fetch(SCRIPT_URL, {
