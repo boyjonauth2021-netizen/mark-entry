@@ -646,7 +646,7 @@ function loadMarks() {
   .then(function(r){ return r.json(); })
   .then(function(data) {
     if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
-    parseAndRender(data.values || []);
+    parseAndRender(data.values || [], data.lastCol);
   })
   .catch(function(){ showToast('Failed to load. Check connection.', 'error'); });
 }
@@ -660,13 +660,51 @@ function findNameColumn(codeRow, subjColMap) {
   return undefined;
 }
 
-// 0 = student takes this subject (show entry). Empty = does not take subject.
+function padRow(row, minLen) {
+  var out = row ? row.slice() : [];
+  while (out.length < minLen) out.push('');
+  return out;
+}
+
+function getSheetWidth(rows, lastColHint) {
+  var max = lastColHint || 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].length > max) max = rows[i].length;
+  }
+  return max;
+}
+
+function findCodeRowIndex(rows, sheetWidth) {
+  for (var r = 0; r < Math.min(8, rows.length); r++) {
+    var row = padRow(rows[r], sheetWidth);
+    var hasName = false;
+    var hasSubj = false;
+    for (var c = 0; c < row.length; c++) {
+      var v = String(row[c] || '').trim().toLowerCase();
+      if (v === 'name') hasName = true;
+      if (v.indexOf('subj') === 0 || v === 'remarks') hasSubj = true;
+    }
+    if (hasName && hasSubj) return r;
+  }
+  return 2;
+}
+
+// Empty = does not take subject. 0 or any value = takes subject / show entry.
+function isActiveSubjectCell(raw) {
+  if (raw === null || raw === undefined) return false;
+  if (typeof raw === 'number') return !isNaN(raw);
+  return String(raw).trim() !== '';
+}
+
 function subjectCellMeta(raw) {
-  if (raw === null || raw === undefined) return { active: false };
+  if (!isActiveSubjectCell(raw)) return { active: false };
+  if (typeof raw === 'number' && raw === 0) {
+    return { active: true, placeholder: '0', sheetValue: '0' };
+  }
   var s = String(raw).trim();
-  if (s === '') return { active: false };
-  if (s === '0' || Number(s) === 0) {
-    return { active: true, placeholder: '—', sheetValue: '0' };
+  var n = parseFloat(s);
+  if (s === '0' || (!isNaN(n) && n === 0)) {
+    return { active: true, placeholder: '0', sheetValue: '0' };
   }
   return { active: true, placeholder: s, sheetValue: s };
 }
@@ -678,10 +716,12 @@ function escapeAttr(str) {
     .replace(/</g, '&lt;');
 }
 
-function parseAndRender(rows) {
+function parseAndRender(rows, lastColHint) {
   if (rows.length < 3) { showToast('Sheet data not found', 'error'); return; }
 
-  var codeRow  = rows[2]; // Row 3 = codes
+  var sheetWidth = getSheetWidth(rows, lastColHint);
+  var codeRowIndex = findCodeRowIndex(rows, sheetWidth);
+  var codeRow = padRow(rows[codeRowIndex], sheetWidth);
   var subjColMap = {};
   codeRow.forEach(function(code, i) {
     if (code) subjColMap[String(code).trim()] = i;
@@ -700,11 +740,12 @@ function parseAndRender(rows) {
   }
 
   var students = [];
-  for (var i = 3; i < rows.length; i++) {
-    var name = (rows[i][nameCol] || '').toString().trim();
+  for (var i = codeRowIndex + 1; i < rows.length; i++) {
+    var row = padRow(rows[i], sheetWidth);
+    var name = (row[nameCol] || '').toString().trim();
     if (!name) continue;
 
-    var cellRaw = rows[i][subjCol];
+    var cellRaw = row[subjCol];
     var meta = subjectCellMeta(cellRaw);
     if (!meta.active) continue;
 
@@ -759,7 +800,7 @@ function renderStudentRows(students) {
         '<button class="pib-btn ' + selB + '" data-val="B" onclick="selectPIB(this)">Basic</button>' +
         '</div>';
     } else {
-      var rph = student.placeholder === '—' ? 'Enter remarks...' : student.placeholder;
+      var rph = student.sheetValue === '0' ? 'Enter remarks...' : student.placeholder;
       inputHtml = '<textarea class="remarks-input" placeholder="' + escapeAttr(rph) + '"' +
         ' data-sheet-value="' + escapeAttr(student.sheetValue) + '" data-touched="false"' +
         ' oninput="this.dataset.touched=\'true\'"></textarea>';
