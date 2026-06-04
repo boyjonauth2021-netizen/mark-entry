@@ -764,7 +764,7 @@ function parseAndRender(rows, lastColHint) {
     classDisplayName() + ' · ' + students.length + ' students';
 
   renderStudentRows(students);
-  document.getElementById('btn-submit').disabled = students.length > 0;
+  document.getElementById('btn-submit').disabled = students.length === 0;
   if (students.length === 0) {
     showToast('No students take this subject in this class', 'error');
   }
