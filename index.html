@@ -67,7 +67,8 @@
   .topbar-row    { display: flex; align-items: center; justify-content: space-between; }
   .topbar-title  { font-size: 22px; font-weight: 700; }
   .topbar-sub    { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 3px; }
-  .topbar-crumb  { font-size: 13px; color: var(--accent); margin-top: 6px; font-weight: 600; min-height: 18px; }
+  .topbar-crumb   { font-size: 13px; color: var(--accent); margin-top: 6px; font-weight: 600; min-height: 18px; }
+  .topbar-teacher { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 2px; font-weight: 500; }
   .user-avatar {
     width: 38px; height: 38px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.3); object-fit: cover;
@@ -216,6 +217,7 @@
   .toast.show    { transform: translateX(-50%) translateY(0); }
   .toast.success { background: #1a7a4a; }
   .toast.error   { background: var(--danger); }
+  .toast.info    { background: #2c5fa8; }
 
   /* ── Loading ── */
   .loading {
@@ -291,6 +293,7 @@
       <div>
         <div class="topbar-title">📝 Mark Entry</div>
         <div class="topbar-sub">B. Ramlallah State Secondary School</div>
+        <div class="topbar-teacher" id="teacher-welcome" style="display:none"></div>
       </div>
       <div class="user-initial" id="user-avatar" onclick="openUserMenu()">?</div>
     </div>
@@ -468,17 +471,18 @@ var state = {
   spreadsheetId: null,
   subject: null,
   students: [],
-  sheetData: null
+  sheetData: null,
+  profile: null
 };
 var tokenClient;
 
 // ── Auth ─────────────────────────────────────────────────────
 window.onload = function() {
-  // Check if already signed in
-  var saved = sessionStorage.getItem('userInfo');
-  if (saved && sessionStorage.getItem('accessToken')) {
+  var saved        = sessionStorage.getItem('userInfo');
+  var savedProfile = sessionStorage.getItem('teacherProfile');
+  if (saved && savedProfile && sessionStorage.getItem('accessToken')) {
     accessToken = sessionStorage.getItem('accessToken');
-    showApp(JSON.parse(saved));
+    showApp(JSON.parse(saved), JSON.parse(savedProfile));
   }
 };
 
@@ -499,15 +503,37 @@ function signIn() {
       })
       .then(function(r){ return r.json(); })
       .then(function(user) {
-        sessionStorage.setItem('userInfo', JSON.stringify(user));
-        showApp(user);
+        showToast('Checking access...', 'info');
+        fetchProfile(function(profile) {
+          if (profile.error) {
+            showToast(profile.error, 'error');
+            sessionStorage.clear();
+            accessToken = null;
+            return;
+          }
+          sessionStorage.setItem('userInfo', JSON.stringify(user));
+          sessionStorage.setItem('teacherProfile', JSON.stringify(profile));
+          showApp(user, profile);
+        });
       });
     }
   });
   tokenClient.requestAccessToken();
 }
 
-function showApp(user) {
+function fetchProfile(callback) {
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'getProfile', token: accessToken })
+  })
+  .then(function(r){ return r.json(); })
+  .then(callback)
+  .catch(function(){ callback({ error: 'Connection error. Please try again.' }); });
+}
+
+function showApp(user, profile) {
+  state.profile = profile;
+
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'flex';
 
@@ -519,6 +545,13 @@ function showApp(user) {
   // Set menu
   document.getElementById('menu-name').textContent  = user.name  || '';
   document.getElementById('menu-email').textContent = user.email || '';
+
+  // Show teacher welcome
+  var welcomeEl = document.getElementById('teacher-welcome');
+  if (profile && (profile.name || profile.surname)) {
+    welcomeEl.textContent = 'Welcome, ' + [profile.name, profile.surname].filter(Boolean).join(' ');
+    welcomeEl.style.display = '';
+  }
 
   renderGrades();
 }
@@ -560,7 +593,12 @@ function classDisplayName() {
 function renderGrades() {
   var grid = document.getElementById('grade-grid');
   grid.innerHTML = '';
+  var allowed = (state.profile && state.profile.grades)
+    ? state.profile.grades.split(',').map(function(g){ return g.trim(); })
+    : Object.keys(GRADE_CONFIG);
+
   Object.keys(GRADE_CONFIG).forEach(function(g) {
+    if (allowed.indexOf(g) === -1) return;
     var card = document.createElement('div');
     card.className = 'choice-card';
     card.innerHTML = g + '<div class="card-sub">Grade ' + g.replace('G','') + '</div>';
@@ -610,7 +648,12 @@ function selectClass(cls) {
 function renderSubjects() {
   var list = document.getElementById('subject-list');
   list.innerHTML = '';
+  var allowedCodes = (state.profile && state.profile.subjects)
+    ? state.profile.subjects.split(',').map(function(c){ return c.trim(); })
+    : null;
+
   SUBJECTS.forEach(function(subj) {
+    if (allowedCodes && allowedCodes.indexOf(subj.code) === -1) return;
     var item = document.createElement('div');
     item.className = 'subject-item';
     var typeLabel = subj.type==='mark' ? 'Mark' : subj.type==='pib' ? 'P / I / B' : 'Remarks';
