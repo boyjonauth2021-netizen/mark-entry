@@ -378,60 +378,68 @@ var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbwLsh4vy3g5C0_DZ45nCQ
 var SCOPES      = 'openid email profile';
 var accessToken = null;
 
-var SPREADSHEET_G7G8 = '1xZWPBK2CD0KwT2JAJubl5J7skHO3rZDX8F8Cs5_o4Dw';
-var SPREADSHEET_G9   = '1-4pkmA_7B1dVgK_nF9sXB5Ch00EPRA97NWk2hx1APn8';
-var SPREADSHEET_G10  = '1KsG0JMB8dMUAuicCvmZEgvEAOk9mJxB0zmztKel6-eY';
-var SPREADSHEET_G11  = '1oeo_uWZBFyftgAP74u6udvCku9znk94lNVQxKVjy4RA';
-var SPREADSHEET_G12  = '1OGS-G-_36AHAJx8xC8O3dtV9NzP1rhyZUJ9jYWRzf9Y';
+var SPREADSHEET_G7G8   = '1xZWPBK2CD0KwT2JAJubl5J7skHO3rZDX8F8Cs5_o4Dw';
+var SPREADSHEET_G9     = '1-4pkmA_7B1dVgK_nF9sXB5Ch00EPRA97NWk2hx1APn8';
+var SPREADSHEET_G10G11 = '1WdXJom9i_a0JA3OadNn5HraZvfrO-lETBydYNdQBfL0';
+var SPREADSHEET_G12G13 = '1y0SjWbd0mMpP5AHYYe1KJa0ej6Z0K-_xeN3cnQhoK6A';
 
 var GRADE_CONFIG = {
   'G7': {
     spreadsheetId: SPREADSHEET_G7G8,
     classes: [
-      { label: 'Red', tab: 'G7 Red' },
-      { label: 'Blue', tab: 'G7 Blue' },
+      { label: 'Red',    tab: 'G7 Red'    },
+      { label: 'Blue',   tab: 'G7 Blue'   },
       { label: 'Yellow', tab: 'G7 Yellow' }
     ]
   },
   'G8': {
     spreadsheetId: SPREADSHEET_G7G8,
     classes: [
-      { label: 'Red', tab: 'G8 Red' },
-      { label: 'Blue', tab: 'G8 Blue' },
-      { label: 'Yellow', tab: 'G8 Yellow' }
+      { label: 'Red',    tab: 'G8 Red'    },
+      { label: 'Blue',   tab: 'G8 Blue'   },
+      { label: 'Yellow', tab: 'G8 Yellow' },
+      { label: 'Ext',    tab: 'G8 Ext'    }
     ]
   },
   'G9': {
     spreadsheetId: SPREADSHEET_G9,
     classes: [
-      { label: 'Red', tab: 'G9 Red' },
-      { label: 'Blue', tab: 'G9 Blue' },
-      { label: 'Yellow', tab: 'G9 Yellow' }
+      { label: 'Red',    tab: 'G9 Red'    },
+      { label: 'Blue',   tab: 'G9 Blue'   },
+      { label: 'Yellow', tab: 'G9 Yellow' },
+      { label: 'Ext',    tab: 'G9 Ext'    }
     ]
   },
   'G10': {
-    spreadsheetId: SPREADSHEET_G10,
+    spreadsheetId: SPREADSHEET_G10G11,
     classes: [
-      { label: 'ART', tab: 'G10 ART' },
+      { label: 'Art',  tab: 'G10 Art'  },
       { label: 'Eco1', tab: 'G10 Eco1' },
       { label: 'Eco2', tab: 'G10 Eco2' },
-      { label: 'ST', tab: 'G10 ST' }
+      { label: 'ST',   tab: 'G10 ST'   }
     ]
   },
   'G11': {
-    spreadsheetId: SPREADSHEET_G11,
+    spreadsheetId: SPREADSHEET_G10G11,
     classes: [
-      { label: 'Art', tab: 'G11 Art' },
+      { label: 'Art',  tab: 'G11 Art'  },
       { label: 'Eco1', tab: 'G11 Eco1' },
       { label: 'Eco2', tab: 'G11 Eco2' },
-      { label: 'ST', tab: 'G11 ST' }
+      { label: 'ST',   tab: 'G11 ST'   }
     ]
   },
   'G12': {
-    spreadsheetId: SPREADSHEET_G12,
+    spreadsheetId: SPREADSHEET_G12G13,
     classes: [
-      { label: 'Eco1', tab: 'G12 Eco1' },
-      { label: 'ST', tab: 'G12 ST' }
+      { label: 'Eco', tab: 'G12 Eco' },
+      { label: 'ST',  tab: 'G12 ST'  }
+    ]
+  },
+  'G13': {
+    spreadsheetId: SPREADSHEET_G12G13,
+    classes: [
+      { label: 'Eco', tab: 'G13 Eco' },
+      { label: 'ST',  tab: 'G13 ST'  }
     ]
   }
 };
@@ -665,9 +673,17 @@ function renderSubjects() {
   var allowedCodes = (state.profile && state.profile.subjects)
     ? state.profile.subjects.split(',').map(function(c){ return c.trim(); })
     : null;
+  var formMaster = state.profile && state.profile.form_master
+    ? state.profile.form_master.trim()
+    : '';
 
   SUBJECTS.forEach(function(subj) {
-    if (allowedCodes && allowedCodes.indexOf(subj.code) === -1) return;
+    if (subj.code === 'REMARKS') {
+      // Only show REMARKS for the teacher's own form master class
+      if (!formMaster || state.tabName !== formMaster) return;
+    } else {
+      if (allowedCodes && allowedCodes.indexOf(subj.code) === -1) return;
+    }
     var item = document.createElement('div');
     item.className = 'subject-item';
     var typeLabel = subj.type==='mark' ? 'Mark' : subj.type==='pib' ? 'P / I / B' : 'Remarks';
