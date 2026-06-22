@@ -181,13 +181,19 @@
   .pib-btn.selected-b { background: #f8d7da; border-color: #e74c3c; color: #721c24; }
 
   /* ── Remarks ── */
-  .remarks-input {
-    width: 100%; min-height: 90px; border: 2.5px solid var(--border);
-    border-radius: 12px; font-size: 16px; padding: 12px 14px;
+  .remarks-select {
+    width: 100%; border: 2.5px solid var(--border);
+    border-radius: 12px; font-size: 15px; padding: 14px 12px;
     color: var(--text); background: var(--bg); outline: none;
-    resize: vertical; transition: border-color 0.15s; font-family: inherit;
+    transition: border-color 0.15s; font-family: inherit;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7a9a' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
   }
-  .remarks-input:focus { border-color: var(--accent); background: #fff; }
+  .remarks-select:focus { border-color: var(--accent); background-color: #fff; }
+  .remarks-select.filled { border-color: var(--accent); background-color: #fff; }
 
   /* ── Submit ── */
   .submit-wrap {
@@ -483,6 +489,17 @@ var SUBJECTS = [
   { name: 'Hindi (SUB)',             code: 'SUBJ81', type: 'mark' },
   { name: 'Life Skills & Values',    code: 'SUBJ28', type: 'pib'  },
   { name: 'Form Master Remarks',     code: 'REMARKS',type: 'remarks' },
+];
+
+var REMARKS_OPTIONS = [
+  'Outstanding performance. Keep up the great work!',
+  'Impressive effort! Keep striving for excellence.',
+  'Shows great potential.',
+  'Good work! Keep improving and aiming higher.',
+  'Reliable, supportive, and always willing to help.',
+  'Needs to be more engaged and attentive in class.',
+  'Should work on staying more focused and consistent.',
+  'Needs to develop a more positive approach to learning.'
 ];
 
 // ── State ────────────────────────────────────────────────────
@@ -789,6 +806,27 @@ function escapeAttr(str) {
     .replace(/</g, '&lt;');
 }
 
+function buildRemarksSelectHtml(sheetValue) {
+  var sv = String(sheetValue || '').trim();
+  var isPlaceholder = sv === '' || sv === '0';
+  var matched = !isPlaceholder && REMARKS_OPTIONS.indexOf(sv) !== -1;
+  var html = '<select class="remarks-select' + (matched ? ' filled' : '') + '"' +
+    ' data-sheet-value="' + escapeAttr(sv) + '" data-touched="false"' +
+    ' onchange="onRemarksSelect(this)">';
+  html += '<option value=""' + (!matched ? ' selected' : '') + '>Select remark...</option>';
+  REMARKS_OPTIONS.forEach(function(opt) {
+    var sel = matched && sv === opt ? ' selected' : '';
+    html += '<option value="' + escapeAttr(opt) + '"' + sel + '>' + escapeAttr(opt) + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+function onRemarksSelect(select) {
+  select.dataset.touched = 'true';
+  select.classList.toggle('filled', select.value !== '');
+}
+
 function parseAndRender(rows, lastColHint) {
   if (rows.length < 3) { showToast('Sheet data not found', 'error'); return; }
 
@@ -873,10 +911,7 @@ function renderStudentRows(students) {
         '<button class="pib-btn ' + selB + '" data-val="B" onclick="selectPIB(this)">Basic</button>' +
         '</div>';
     } else {
-      var rph = student.sheetValue === '0' ? 'Enter remarks...' : student.placeholder;
-      inputHtml = '<textarea class="remarks-input" placeholder="' + escapeAttr(rph) + '"' +
-        ' data-sheet-value="' + escapeAttr(student.sheetValue) + '" data-touched="false"' +
-        ' oninput="this.dataset.touched=\'true\'"></textarea>';
+      inputHtml = buildRemarksSelectHtml(student.sheetValue);
     }
 
     row.innerHTML =
@@ -940,10 +975,9 @@ function submitMarks() {
       updates.push({ row: state.students[i].rowIndex + 1, col: col1, value: val });
     });
   } else {
-    document.querySelectorAll('.remarks-input').forEach(function(ta, i) {
-      if (ta.dataset.touched !== 'true') return;
-      var val = ta.value.trim();
-      if (val === '' && ta.dataset.sheetValue === '0') val = '';
+    document.querySelectorAll('.remarks-select').forEach(function(sel, i) {
+      if (sel.dataset.touched !== 'true') return;
+      var val = sel.value.trim();
       updates.push({ row: state.students[i].rowIndex + 1, col: col1, value: val });
     });
   }
