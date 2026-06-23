@@ -1040,9 +1040,9 @@ function renderReportCardRow(cardEl, student, idx) {
     if (!code.match(/^SUBJ\d+$/)) return;
     var col  = colMap[code];
     var mark = row[col];
-    if (mark === null || mark === undefined || mark === '' || mark === '0' || mark === 0) return;
+    if (mark === null || mark === undefined || mark === '') return;
     var markStr = String(mark).trim();
-    if (markStr === '0') return;
+    if (markStr === '') return;
 
     var dispName = (dispRow[col] || '').toString().trim() || code;
     var rankCode = 'R_' + code;
