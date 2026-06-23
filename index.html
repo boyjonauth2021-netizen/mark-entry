@@ -180,6 +180,56 @@
   .pib-btn.selected-i { background: #fff3cd; border-color: #f0ad4e; color: #856404; }
   .pib-btn.selected-b { background: #f8d7da; border-color: #e74c3c; color: #721c24; }
 
+  /* ── Report Card ── */
+  .report-card {
+    background: var(--card); border-radius: 16px;
+    border: 2px solid var(--border); box-shadow: 0 2px 10px rgba(26,26,46,0.08);
+    margin-bottom: 18px; overflow: hidden;
+  }
+  .rc-header {
+    background: var(--primary); color: #fff;
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .rc-name { font-size: 15px; font-weight: 700; flex: 1; }
+  .rc-badge {
+    font-size: 11px; font-weight: 800; letter-spacing: 1px;
+    padding: 4px 10px; border-radius: 20px;
+  }
+  .rc-badge-pass { background: #d4edda; color: #155724; }
+  .rc-badge-fail { background: #f8d7da; color: #721c24; }
+  .rc-badge-na   { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); }
+  .rc-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .rc-stat {
+    padding: 10px 12px; border-right: 1px solid var(--border); text-align: center;
+  }
+  .rc-stat:last-child { border-right: none; }
+  .rc-stat-label { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .rc-stat-value { font-size: 17px; font-weight: 800; color: var(--text); margin-top: 2px; }
+  .rc-subjects { padding: 6px 0; }
+  .rc-subj-row {
+    display: flex; align-items: center; padding: 7px 14px;
+    border-bottom: 1px solid #f0f0f8; font-size: 13px;
+  }
+  .rc-subj-row:last-child { border-bottom: none; }
+  .rc-subj-name { flex: 1; font-weight: 600; color: var(--text); }
+  .rc-subj-mark { width: 52px; text-align: right; font-weight: 800; font-size: 14px; color: var(--text); }
+  .rc-subj-grade { width: 32px; text-align: center; font-weight: 800; font-size: 14px; color: #c9a84c; }
+  .rc-subj-rank  { width: 44px; text-align: center; font-size: 11px; color: var(--muted); }
+  .rc-subj-remark { width: 80px; text-align: right; font-size: 11px; font-weight: 700; }
+  .rc-rem-1 { color: #1a7a4a; }
+  .rc-rem-2 { color: #2a9d5c; }
+  .rc-rem-3 { color: #3aaa6a; }
+  .rc-rem-4 { color: #c9a84c; }
+  .rc-rem-5 { color: #e07a30; }
+  .rc-rem-6 { color: #c0392b; }
+  .rc-rem-pi { color: #1a7a4a; }
+  .rc-absent { padding: 6px 14px 8px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
+  .rc-remark-wrap { padding: 12px 14px 14px; border-top: 2px solid var(--border); background: #f8faff; }
+  .rc-remark-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+
   /* ── Remarks ── */
   .remarks-select {
     width: 100%; border: 2.5px solid var(--border);
@@ -833,6 +883,13 @@ function parseAndRender(rows, lastColHint) {
   var sheetWidth = getSheetWidth(rows, lastColHint);
   var codeRowIndex = findCodeRowIndex(rows, sheetWidth);
   var codeRow = padRow(rows[codeRowIndex], sheetWidth);
+  // Display names: search upward from code row for the row that has most subject name text
+  var displayRow = codeRow;
+  for (var dr = codeRowIndex - 1; dr >= 0; dr--) {
+    var candidate = padRow(rows[dr], sheetWidth);
+    var hasText = candidate.some(function(v) { return v && String(v).trim().length > 2 && !String(v).match(/^SUBJ|^R_SUBJ/); });
+    if (hasText) { displayRow = candidate; break; }
+  }
   var subjColMap = {};
   codeRow.forEach(function(code, i) {
     if (code) subjColMap[String(code).trim()] = i;
@@ -850,6 +907,8 @@ function parseAndRender(rows, lastColHint) {
     return;
   }
 
+  var isRemarks = state.subject.type === 'remarks';
+
   var students = [];
   for (var i = codeRowIndex + 1; i < rows.length; i++) {
     var row = padRow(rows[i], sheetWidth);
@@ -860,16 +919,28 @@ function parseAndRender(rows, lastColHint) {
     var meta = subjectCellMeta(cellRaw);
     if (!meta.active) continue;
 
-    students.push({
+    var student = {
       name: name,
       rowIndex: i,
       placeholder: meta.placeholder,
       sheetValue: meta.sheetValue
-    });
+    };
+
+    // For remarks view, attach full row data for report card
+    if (isRemarks) {
+      student.fullRow = row;
+    }
+
+    students.push(student);
   }
 
-  state.students   = students;
-  state.sheetData  = { codeRow: codeRow, subjCol: subjCol };
+  state.students  = students;
+  state.sheetData = {
+    codeRow:    codeRow,
+    displayRow: displayRow,
+    subjCol:    subjCol,
+    colMap:     subjColMap
+  };
 
   document.getElementById('marks-sub').textContent =
     classDisplayName() + ' · ' + students.length + ' students';
@@ -911,7 +982,10 @@ function renderStudentRows(students) {
         '<button class="pib-btn ' + selB + '" data-val="B" onclick="selectPIB(this)">Basic</button>' +
         '</div>';
     } else {
-      inputHtml = buildRemarksSelectHtml(student.sheetValue);
+      // Remarks: show full report card + dropdown
+      list.appendChild(row);
+      renderReportCardRow(row, student, idx);
+      return;
     }
 
     row.innerHTML =
@@ -920,6 +994,111 @@ function renderStudentRows(students) {
     list.appendChild(row);
   });
   container.appendChild(list);
+}
+
+// ── Report Card Row (Form Master Remarks view) ───────────────
+var MAX_MARK_MAP = {
+  'SUBJ12': 50, 'SUBJ19': 50, 'SUBJ11': 50, 'SUBJ13': 50,
+  'SUBJ17': 50, 'SUBJ18': 50, 'SUBJ1': 35, 'SUBJ38': 35,
+  'SUBJ6': 35, 'SUBJ14': 30
+};
+
+function gradeInfo(pct) {
+  if (pct >= 90) return { grade: '1', remark: 'Excellent',        cls: 'rc-rem-1' };
+  if (pct >= 75) return { grade: '2', remark: 'Very Good',        cls: 'rc-rem-2' };
+  if (pct >= 60) return { grade: '3', remark: 'Good',             cls: 'rc-rem-3' };
+  if (pct >= 50) return { grade: '4', remark: 'Average',          cls: 'rc-rem-4' };
+  if (pct >= 40) return { grade: '5', remark: 'Needs Improv.',    cls: 'rc-rem-5' };
+  return           { grade: '6', remark: 'Unsatisfactory',        cls: 'rc-rem-6' };
+}
+
+function renderReportCardRow(cardEl, student, idx) {
+  var colMap    = state.sheetData.colMap;
+  var dispRow   = state.sheetData.displayRow;
+  var row       = student.fullRow;
+
+  // Stats
+  var perRaw  = row[colMap['PER']];
+  var perVal  = (perRaw !== '' && perRaw !== undefined && perRaw !== null && !isNaN(parseFloat(perRaw)))
+                ? (parseFloat(perRaw) * 100).toFixed(1) + '%' : '—';
+  var result  = ((row[colMap['PASS_FAIL']] || '')).toString().trim().toUpperCase();
+  var rankRaw = row[colMap['RANK']];
+  var rankVal = (rankRaw !== '' && rankRaw !== undefined && rankRaw !== null && !isNaN(parseFloat(rankRaw)))
+                ? Math.round(parseFloat(rankRaw)) : null;
+  var absRaw  = row[colMap['absences'] !== undefined ? colMap['absences'] : colMap['ABSENCES']];
+  var lateRaw = row[colMap['lateness'] !== undefined ? colMap['lateness'] : colMap['LATENESS']];
+  var absVal  = (absRaw !== undefined && absRaw !== null && absRaw !== '') ? absRaw : '—';
+  var lateVal = (lateRaw !== undefined && lateRaw !== null && lateRaw !== '') ? lateRaw : '—';
+
+  var isPassed = result === 'PASS';
+  var badgeCls = result === 'PASS' ? 'rc-badge-pass' : result === 'FAIL' ? 'rc-badge-fail' : 'rc-badge-na';
+  var badgeTxt = result || '—';
+
+  // Subject rows
+  var subjRowsHtml = '';
+  Object.keys(colMap).forEach(function(code) {
+    if (!code.match(/^SUBJ\d+$/)) return;
+    var col  = colMap[code];
+    var mark = row[col];
+    if (mark === null || mark === undefined || mark === '' || mark === '0' || mark === 0) return;
+    var markStr = String(mark).trim();
+    if (markStr === '0') return;
+
+    var dispName = (dispRow[col] || '').toString().trim() || code;
+    var rankCode = 'R_' + code;
+    var subjRank = colMap[rankCode] !== undefined ? row[colMap[rankCode]] : null;
+    var rankDisp = (subjRank !== null && subjRank !== undefined && subjRank !== '') ? subjRank : '—';
+
+    if (markStr === 'P' || markStr === 'I' || markStr === 'B') {
+      var piLabel = markStr === 'P' ? 'Proficient' : markStr === 'I' ? 'Intermediate' : 'Basic';
+      var piCls   = markStr === 'P' ? 'rc-rem-1' : markStr === 'B' ? 'rc-rem-6' : 'rc-rem-4';
+      subjRowsHtml += '<div class="rc-subj-row">' +
+        '<span class="rc-subj-name">' + dispName + '</span>' +
+        '<span class="rc-subj-mark">' + markStr + '</span>' +
+        '<span class="rc-subj-grade">—</span>' +
+        '<span class="rc-subj-rank">—</span>' +
+        '<span class="rc-subj-remark ' + piCls + '">' + piLabel + '</span>' +
+        '</div>';
+      return;
+    }
+
+    var numMark = Math.floor(parseFloat(markStr));
+    if (isNaN(numMark)) return;
+    var maxMark = MAX_MARK_MAP[code] || 100;
+    var pct     = (numMark / maxMark) * 100;
+    var gi      = gradeInfo(pct);
+
+    subjRowsHtml += '<div class="rc-subj-row">' +
+      '<span class="rc-subj-name">' + dispName + '</span>' +
+      '<span class="rc-subj-mark">' + numMark + '<span style="font-size:9px;font-weight:400;color:#aaa">/' + maxMark + '</span></span>' +
+      '<span class="rc-subj-grade">' + gi.grade + '</span>' +
+      '<span class="rc-subj-rank">' + rankDisp + '</span>' +
+      '<span class="rc-subj-remark ' + gi.cls + '">' + gi.remark + '</span>' +
+      '</div>';
+  });
+
+  if (!subjRowsHtml) {
+    subjRowsHtml = '<div class="rc-subj-row" style="color:var(--muted);font-style:italic">No marks entered yet</div>';
+  }
+
+  var rankStr = rankVal !== null ? rankVal + ' / ' + state.students.length : '—';
+
+  cardEl.className = 'report-card';
+  cardEl.innerHTML =
+    '<div class="rc-header">' +
+      '<span class="rc-name"><span style="background:rgba(255,255,255,0.2);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-right:10px;">' + (idx+1) + '</span>' + student.name + '</span>' +
+      '<span class="rc-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
+    '</div>' +
+    '<div class="rc-stats">' +
+      '<div class="rc-stat"><div class="rc-stat-label">Rank</div><div class="rc-stat-value">' + rankStr + '</div></div>' +
+      '<div class="rc-stat"><div class="rc-stat-label">Percentage</div><div class="rc-stat-value">' + perVal + '</div></div>' +
+      '<div class="rc-stat"><div class="rc-stat-label">Abs / Late</div><div class="rc-stat-value" style="font-size:14px">' + absVal + ' / ' + lateVal + '</div></div>' +
+    '</div>' +
+    '<div class="rc-subjects">' + subjRowsHtml + '</div>' +
+    '<div class="rc-remark-wrap">' +
+      '<div class="rc-remark-label">Form Teacher\'s Remark</div>' +
+      buildRemarksSelectHtml(student.sheetValue) +
+    '</div>';
 }
 
 function onMarkInput(input) {
