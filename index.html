@@ -657,13 +657,31 @@ function openUserMenu()  { document.getElementById('user-menu').classList.add('o
 function closeUserMenu() { document.getElementById('user-menu').classList.remove('open'); }
 
 // ── Navigation ────────────────────────────────────────────────
-function goTo(screen) {
+// Screens that should push a history entry when navigated to
+var PUSH_HISTORY_SCREENS = { stream: true, subject: true, marks: true, success: true };
+
+function goTo(screen, fromPopstate) {
   document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
   document.getElementById('screen-' + screen).classList.add('active');
   document.getElementById('submit-wrap').style.display = screen === 'marks' ? 'block' : 'none';
   window.scrollTo(0, 0);
   updateBreadcrumb();
+  // Push a history entry so the browser back button stays inside the app
+  if (!fromPopstate && PUSH_HISTORY_SCREENS[screen]) {
+    history.pushState({ screen: screen }, '');
+  }
 }
+
+window.addEventListener('popstate', function(e) {
+  var screen = e.state && e.state.screen;
+  if (screen) {
+    // Navigate back within the app without pushing another history entry
+    goTo(screen, true);
+  } else {
+    // No app state in history — go back to the grade screen
+    goTo('grade', true);
+  }
+});
 
 function updateBreadcrumb() {
   var crumb = '';
