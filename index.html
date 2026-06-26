@@ -575,6 +575,22 @@ window.onload = function() {
   if (saved && savedProfile && sessionStorage.getItem('accessToken')) {
     accessToken = sessionStorage.getItem('accessToken');
     showApp(JSON.parse(saved), JSON.parse(savedProfile));
+    // Silently refresh profile from the sheet so StaffAdmin edits show up on reload
+    fetchProfile(function(profile) {
+      if (!profile || profile.error) return; // keep cached copy on error/expired token
+      sessionStorage.setItem('teacherProfile', JSON.stringify(profile));
+      state.profile = profile;
+      // Re-render grades only if the teacher is still on the grade screen (not mid-entry)
+      var gradeScreen = document.getElementById('screen-grade');
+      if (gradeScreen && gradeScreen.classList.contains('active')) {
+        renderGrades();
+      }
+      // Update welcome text in case the name changed
+      var welcomeEl = document.getElementById('teacher-welcome');
+      if (welcomeEl && (profile.name || profile.surname)) {
+        welcomeEl.textContent = 'Welcome, ' + [profile.name, profile.surname].filter(Boolean).join(' ');
+      }
+    });
   }
 };
 
