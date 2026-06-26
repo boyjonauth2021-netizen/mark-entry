@@ -995,7 +995,8 @@ function renderStudentRows(students) {
         ' data-sheet-value="' + escapeAttr(student.sheetValue) + '"' +
         ' data-max="' + subjMaxMark + '"' +
         ' data-touched="false"' +
-        ' oninput="onMarkInput(this)">';
+        ' oninput="onMarkInput(this)"' +
+        ' onblur="onMarkBlur(this)">';
     } else if (state.subject.type === 'pib') {
       var sv = student.sheetValue;
       var selP = sv==='P' ? 'selected-p' : '';
@@ -1205,6 +1206,14 @@ function onMarkInput(input) {
   else input.classList.add('filled');
 }
 
+function onMarkBlur(input) {
+  if (!input.classList.contains('invalid')) return;
+  var maxVal = parseInt(input.dataset.max || '100', 10);
+  showToast('Mark must be between 0 and ' + maxVal + '. Value cleared.', 'error');
+  input.value = '';
+  input.classList.remove('invalid');
+}
+
 function selectPIB(btn) {
   var group = btn.parentElement;
   group.dataset.touched = 'true';
@@ -1218,7 +1227,9 @@ function markValueToSave(input) {
   var raw = input.value.trim();
   if (raw !== '') {
     var n = parseInt(raw, 10);
-    return isNaN(n) ? '' : n;
+    var maxVal = parseInt(input.dataset.max || '100', 10);
+    if (isNaN(n) || n < 0 || n > maxVal) return '';
+    return n;
   }
   return input.dataset.sheetValue === '0' ? 0 : '';
 }
@@ -1231,6 +1242,14 @@ function submitMarks() {
   var subj    = state.subject;
   var subjCol = state.sheetData.subjCol; // 0-indexed → Apps Script needs 1-indexed
   var col1    = subjCol + 1;
+  var invalidInputs = document.querySelectorAll('.mark-input.invalid');
+  if (invalidInputs.length > 0) {
+    btn.disabled = false;
+    btn.textContent = '✓ Save Marks';
+    showToast('Fix invalid marks before saving.', 'error');
+    return;
+  }
+
   var updates = [];
   if (subj.type === 'mark') {
     document.querySelectorAll('.mark-input').forEach(function(input, i) {
