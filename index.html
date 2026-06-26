@@ -771,6 +771,8 @@ function renderSubjects() {
       if (!formMaster || state.tabName !== formMaster) return;
     } else {
       if (allowedCodes && allowedCodes.indexOf(subj.code) === -1) return;
+      // Hide mark subjects not taught at the selected grade
+      if (subj.type === 'mark' && getMaxMark(subj.code, state.grade) === null) return;
     }
     var item = document.createElement('div');
     item.className = 'subject-item';
@@ -986,10 +988,12 @@ function renderStudentRows(students) {
     var inputHtml = '';
     if (state.subject.type === 'mark') {
       var ph = escapeAttr(student.placeholder);
+      var subjMaxMark = getMaxMark(state.subject.code, state.grade) || 100;
       inputHtml = '<input class="mark-input"' +
-        ' type="number" inputmode="numeric" min="0" max="100"' +
+        ' type="number" inputmode="numeric" min="0" max="' + subjMaxMark + '"' +
         ' placeholder="' + ph + '" value=""' +
         ' data-sheet-value="' + escapeAttr(student.sheetValue) + '"' +
+        ' data-max="' + subjMaxMark + '"' +
         ' data-touched="false"' +
         ' oninput="onMarkInput(this)">';
     } else if (state.subject.type === 'pib') {
@@ -1019,10 +1023,79 @@ function renderStudentRows(students) {
 
 // ── Report Card Row (Form Master Remarks view) ───────────────
 var MAX_MARK_MAP = {
-  'SUBJ12': 50, 'SUBJ19': 50, 'SUBJ11': 50, 'SUBJ13': 50,
-  'SUBJ17': 50, 'SUBJ18': 50, 'SUBJ1': 35, 'SUBJ38': 35,
-  'SUBJ6': 35, 'SUBJ14': 30
+  'SUBJ1':  {'G7': null, 'G8': null, 'G9': 35,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ2':  {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ3':  {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ4':  {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ5':  {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ6':  {'G7': null, 'G8': null, 'G9': 35,    'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ7':  {'G7': 100,  'G8': 100,  'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ8':  {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ9':  {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ10': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ11': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ12': {'G7': 50,   'G8': 50,   'G9': 50,    'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ13': {'G7': 50,   'G8': 50,   'G9': 50,    'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ14': {'G7': null, 'G8': null, 'G9': 30,    'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ15': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ16': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ17': {'G7': 50,   'G8': 50,   'G9': 50,    'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ18': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ19': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ20': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ21': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ23': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ24': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ25': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ26': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ27': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ29': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ30': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ31': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ32': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ33': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ34': {'G7': null, 'G8': null, 'G9': null,  'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ37': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ39': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ40': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ41': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ42': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ43': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': null, 'G11': null, 'G12': null, 'G13': null},
+  'SUBJ44': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
+  'SUBJ45': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ46': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
+  'SUBJ70': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ71': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ72': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ73': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ74': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ75': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ76': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ77': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ78': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ79': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ80': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ81': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ82': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ83': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ84': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ85': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ86': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ87': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ88': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ89': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ90': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ91': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ92': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
+  'SUBJ93': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100}
 };
+
+function getMaxMark(code, grade) {
+  var entry = MAX_MARK_MAP[code];
+  if (!entry) return null;
+  var v = entry[grade || state.grade];
+  return (v !== undefined && v !== null) ? v : null;
+}
 
 function gradeInfo(pct) {
   if (pct >= 90) return { grade: '1', remark: 'Excellent',        cls: 'rc-rem-1' };
@@ -1085,7 +1158,7 @@ function renderReportCardRow(cardEl, student, idx) {
 
     var numMark = Math.floor(parseFloat(markStr));
     if (isNaN(numMark)) return;
-    var maxMark = MAX_MARK_MAP[code] || 100;
+    var maxMark = getMaxMark(code, state.grade) || 100;
     var pct     = (numMark / maxMark) * 100;
     var gi      = gradeInfo(pct);
 
@@ -1125,9 +1198,10 @@ function renderReportCardRow(cardEl, student, idx) {
 function onMarkInput(input) {
   input.dataset.touched = 'true';
   var val = parseInt(input.value, 10);
+  var maxVal = parseInt(input.dataset.max || '100', 10);
   input.classList.remove('filled', 'invalid');
   if (input.value === '') return;
-  if (isNaN(val) || val < 0 || val > 100) input.classList.add('invalid');
+  if (isNaN(val) || val < 0 || val > maxVal) input.classList.add('invalid');
   else input.classList.add('filled');
 }
 
