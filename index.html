@@ -1211,6 +1211,7 @@ function onMarkBlur(input) {
   var maxVal = parseInt(input.dataset.max || '100', 10);
   showToast('Mark must be between 0 and ' + maxVal + '. Value cleared.', 'error');
   input.value = '';
+  input.dataset.touched = 'false';
   input.classList.remove('invalid');
 }
 
@@ -1254,10 +1255,13 @@ function submitMarks() {
   if (subj.type === 'mark') {
     document.querySelectorAll('.mark-input').forEach(function(input, i) {
       if (input.dataset.touched !== 'true') return;
+      var val = markValueToSave(input);
+      // Skip if we would overwrite an existing value with empty (rejected invalid entry)
+      if (val === '' && input.dataset.sheetValue !== '' && input.dataset.sheetValue !== undefined) return;
       updates.push({
         row: state.students[i].rowIndex + 1,
         col: col1,
-        value: markValueToSave(input)
+        value: val
       });
     });
   } else if (subj.type === 'pib') {
