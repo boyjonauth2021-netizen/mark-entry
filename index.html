@@ -529,7 +529,8 @@ var SUBJECTS = [
   { name: 'Kreol Morisien',          code: 'SUBJ27', type: 'mark' },
   { name: 'Mathematics',             code: 'SUBJ32', type: 'mark' },
   { name: 'Performing Arts',         code: 'SUBJ35', type: 'pib'  },
-  { name: 'Physical Education',      code: 'SUBJ36', type: 'pib'  },
+  { name: 'Physical Education',      code: 'SUBJ36', type: 'pib', grades: ['G7','G8','G9'] },
+  { name: 'Physical Education Option', code: 'SUBJ94', type: 'mark' },
   { name: 'Physics',                 code: 'SUBJ37', type: 'mark' },
   { name: 'Science',                 code: 'SUBJ39', type: 'mark' },
   { name: 'Social & Modern Studies', code: 'SUBJ40', type: 'mark' },
@@ -539,7 +540,38 @@ var SUBJECTS = [
   { name: 'Telugu',                  code: 'SUBJ44', type: 'mark' },
   { name: 'Travel & Tourism',        code: 'SUBJ45', type: 'mark' },
   { name: 'Urdu',                    code: 'SUBJ46', type: 'mark' },
+  { name: 'Chinese',                 code: 'SUBJ9',  type: 'mark' },
+  { name: 'Design & Textiles',       code: 'SUBJ13', type: 'mark' },
+  { name: 'Enterprise',              code: 'SUBJ16', type: 'mark' },
+  { name: 'Literature in English',   code: 'SUBJ29', type: 'mark' },
+  { name: 'Literature in Hindi',     code: 'SUBJ30', type: 'mark' },
+  { name: 'Marathi',                 code: 'SUBJ31', type: 'mark' },
+  { name: 'Modern Chinese',          code: 'SUBJ33', type: 'mark' },
+  { name: 'Modern Standard Chinese', code: 'SUBJ34', type: 'mark' },
+  { name: 'Accounting (SUB)',        code: 'SUBJ70', type: 'mark' },
+  { name: 'Art & Design (SUB)',      code: 'SUBJ71', type: 'mark' },
+  { name: 'Biology (SUB)',           code: 'SUBJ72', type: 'mark' },
+  { name: 'Business (SUB)',          code: 'SUBJ73', type: 'mark' },
+  { name: 'Chinese (SUB)',           code: 'SUBJ74', type: 'mark' },
+  { name: 'Computer Science (SUB)',  code: 'SUBJ75', type: 'mark' },
+  { name: 'Design & Textiles (SUB)', code: 'SUBJ76', type: 'mark' },
+  { name: 'Economics (SUB)',         code: 'SUBJ77', type: 'mark' },
+  { name: 'French (SUB)',            code: 'SUBJ78', type: 'mark' },
+  { name: 'General Paper (SUB)',     code: 'SUBJ79', type: 'mark' },
+  { name: 'Global Perspectives (SUB)', code: 'SUBJ80', type: 'mark' },
   { name: 'Hindi (SUB)',             code: 'SUBJ81', type: 'mark' },
+  { name: 'Hinduiism (SUB)',         code: 'SUBJ82', type: 'mark' },
+  { name: 'Islamic Studies (SUB)',   code: 'SUBJ83', type: 'mark' },
+  { name: 'English (SUB)',           code: 'SUBJ84', type: 'mark' },
+  { name: 'Marathi (SUB)',           code: 'SUBJ85', type: 'mark' },
+  { name: 'Mathematics (SUB)',       code: 'SUBJ86', type: 'mark' },
+  { name: 'Physical Education (SUB)',code: 'SUBJ87', type: 'mark' },
+  { name: 'Sociology (SUB)',         code: 'SUBJ88', type: 'mark' },
+  { name: 'Tamil (SUB)',             code: 'SUBJ89', type: 'mark' },
+  { name: 'Telugu (SUB)',            code: 'SUBJ90', type: 'mark' },
+  { name: 'Travel & Tourism (SUB)',  code: 'SUBJ91', type: 'mark' },
+  { name: 'Urdu (SUB)',              code: 'SUBJ92', type: 'mark' },
+  { name: 'Arabic (SUB)',            code: 'SUBJ93', type: 'mark' },
   { name: 'Life Skills & Values',    code: 'SUBJ28', type: 'pib'  },
   { name: 'Form Master Remarks',     code: 'REMARKS',type: 'remarks' },
 ];
@@ -793,6 +825,8 @@ function renderSubjects() {
       // ALL-classes form master is remarks only — hide every mark/PIB subject
       if (isAllClasses) return;
       if (allowedCodes && allowedCodes.indexOf(subj.code) === -1) return;
+      // Honor an optional per-subject grade whitelist (e.g. P/I/B PE only at G7-G9)
+      if (subj.grades && subj.grades.indexOf(state.grade) === -1) return;
       // Hide mark subjects not taught at the selected grade
       if (subj.type === 'mark' && getMaxMark(subj.code, state.grade) === null) return;
     }
@@ -800,15 +834,25 @@ function renderSubjects() {
     item.className = 'subject-item';
     var typeLabel = subj.type==='mark' ? 'Mark' : subj.type==='pib' ? 'P / I / B' : 'Remarks';
     item.innerHTML =
-      '<span class="subject-name">' + subj.name + '</span>' +
+      '<span class="subject-name">' + subjectDisplayName(subj, state.grade) + '</span>' +
       '<span class="subject-type type-' + subj.type + '">' + typeLabel + '</span>';
     item.onclick = function(){ selectSubject(subj); };
     list.appendChild(item);
   });
 }
 
+// Resolve a subject's display name, allowing grade-dependent names (e.g. SUBJ94)
+function subjectDisplayName(subj, grade) {
+  if (subj.code === 'SUBJ94') {
+    return (grade === 'G12' || grade === 'G13') ? 'Physical Education Main' : 'Physical Education Option';
+  }
+  return subj.name;
+}
+
 function selectSubject(subj) {
-  state.subject = subj; updateBreadcrumb(); loadMarks(); goTo('marks');
+  // Store a copy with the resolved (grade-aware) name so title/breadcrumb match the tile
+  state.subject = Object.assign({}, subj, { name: subjectDisplayName(subj, state.grade) });
+  updateBreadcrumb(); loadMarks(); goTo('marks');
 }
 
 // ── Screen 4: Load Marks ──────────────────────────────────────
@@ -1087,30 +1131,31 @@ var MAX_MARK_MAP = {
   'SUBJ44': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': null, 'G13': null},
   'SUBJ45': {'G7': null, 'G8': null, 'G9': null,  'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
   'SUBJ46': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 200,  'G13': 200},
-  'SUBJ70': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ71': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ72': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ73': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ74': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ75': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ76': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ77': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ78': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ79': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ80': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ81': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ82': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ83': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ84': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ85': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ86': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ87': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ88': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ89': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ90': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ91': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ92': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100},
-  'SUBJ93': {'G7': 100,  'G8': 100,  'G9': 100,   'G10': 100,  'G11': 100,  'G12': 100,  'G13': 100}
+  'SUBJ70': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ71': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ72': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ73': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ74': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ75': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ76': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ77': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ78': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ79': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ80': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ81': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ82': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ83': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ84': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ85': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ86': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ87': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ88': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ89': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ90': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ91': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ92': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ93': {'G7': null, 'G8': null, 'G9': null, 'G10': null, 'G11': null, 'G12': 100, 'G13': 100},
+  'SUBJ94': {'G7': null, 'G8': null, 'G9': null, 'G10': 100,  'G11': 100,  'G12': 200, 'G13': 200}
 };
 
 function getMaxMark(code, grade) {
