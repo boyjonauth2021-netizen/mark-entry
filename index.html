@@ -780,12 +780,18 @@ function renderSubjects() {
   var formMaster = state.profile && state.profile.form_master
     ? state.profile.form_master.trim()
     : '';
+  // "ALL" => form master of every class (rector / admin): remarks only, no mark entry
+  var isAllClasses = formMaster.toUpperCase() === 'ALL';
+  var fmList = formMaster.split(',').map(function(s){ return s.trim(); });
 
   SUBJECTS.forEach(function(subj) {
     if (subj.code === 'REMARKS') {
-      // Only show REMARKS for the teacher's own form master class
-      if (!formMaster || state.tabName !== formMaster) return;
+      // Show REMARKS for every class if "ALL", otherwise only the teacher's own class
+      var isFM = isAllClasses || (formMaster && fmList.indexOf(state.tabName) !== -1);
+      if (!isFM) return;
     } else {
+      // ALL-classes form master is remarks only — hide every mark/PIB subject
+      if (isAllClasses) return;
       if (allowedCodes && allowedCodes.indexOf(subj.code) === -1) return;
       // Hide mark subjects not taught at the selected grade
       if (subj.type === 'mark' && getMaxMark(subj.code, state.grade) === null) return;
