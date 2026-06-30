@@ -643,7 +643,6 @@ function signIn() {
       })
       .then(function(r){ return r.json(); })
       .then(function(user) {
-        showToast('Checking access...', 'info');
         fetchProfile(function(profile) {
           if (profile.error) {
             showToast(profile.error, 'error');
@@ -673,6 +672,9 @@ function fetchProfile(callback) {
 
 function showApp(user, profile) {
   state.profile = profile;
+
+  // Clear any lingering toast (e.g. sign-in status) once the app is ready
+  document.getElementById('toast').className = 'toast';
 
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'flex';
@@ -869,7 +871,11 @@ function loadMarks() {
       action: 'read',
       token: accessToken,
       spreadsheetId: state.spreadsheetId,
-      tab: state.tabName
+      tab: state.tabName,
+      grade: state.grade,
+      classLabel: state.classLabel,
+      subjectCode: state.subject.code,
+      subjectName: state.subject.name
     })
   })
   .then(function(r){ return r.json(); })
@@ -1360,6 +1366,10 @@ function submitMarks() {
       token: accessToken,
       spreadsheetId: state.spreadsheetId,
       tab: state.tabName,
+      grade: state.grade,
+      classLabel: state.classLabel,
+      subjectCode: state.subject.code,
+      subjectName: state.subject.name,
       updates: updates
     })
   })
