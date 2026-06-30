@@ -337,7 +337,7 @@
   <div class="login-logo">🏫</div>
   <div class="login-school">B. Ramlallah State Secondary School</div>
   <div class="login-sub">Mark Entry System<br>Sign in with your school Google account</div>
-  <button class="btn-google" onclick="signIn()">
+  <button class="btn-google" id="btn-login" onclick="signIn()">
     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
     Sign in with Google
   </button>
@@ -626,16 +626,35 @@ window.onload = function() {
   }
 };
 
+var signingIn = false;
+
+function setLoginBusy(busy) {
+  var btn = document.getElementById('btn-login');
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.innerHTML = busy
+    ? 'Signing in\u2026'
+    : '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"> Sign in with Google';
+}
+
 function signIn() {
   if (!SCRIPT_URL) {
     showToast('SCRIPT_URL not configured — see google-apps-script.gs', 'error');
     return;
   }
+  if (signingIn) return; // ignore repeat clicks while a sign-in is in progress
+  signingIn = true;
+  setLoginBusy(true);
+
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: function(response) {
-      if (response.error) { showToast('Sign in failed', 'error'); return; }
+      if (response.error) {
+        showToast('Sign in failed', 'error');
+        signingIn = false; setLoginBusy(false);
+        return;
+      }
       accessToken = response.access_token;
       sessionStorage.setItem('accessToken', accessToken);
       fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -648,12 +667,18 @@ function signIn() {
             showToast(profile.error, 'error');
             sessionStorage.clear();
             accessToken = null;
+            signingIn = false; setLoginBusy(false);
             return;
           }
           sessionStorage.setItem('userInfo', JSON.stringify(user));
           sessionStorage.setItem('teacherProfile', JSON.stringify(profile));
+          signingIn = false; setLoginBusy(false);
           showApp(user, profile);
         });
+      })
+      .catch(function() {
+        showToast('Sign in failed. Check connection.', 'error');
+        signingIn = false; setLoginBusy(false);
       });
     }
   });
