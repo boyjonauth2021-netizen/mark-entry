@@ -183,6 +183,23 @@
   .pib-btn.selected-i { background: #fff3cd; border-color: #f0ad4e; color: #856404; }
   .pib-btn.selected-b { background: #f8d7da; border-color: #e74c3c; color: #721c24; }
 
+  /* ── FPLNS (level + comment) ── */
+  .fplns-label { font-size: 12px; font-weight: 700; color: var(--muted); margin: 10px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .fplns-comment {
+    width: 100%; min-height: 72px; border: 2px solid var(--border);
+    border-radius: 12px; font-size: 15px; padding: 12px;
+    color: var(--text); background: var(--bg); outline: none;
+    font-family: inherit; resize: vertical; touch-action: manipulation;
+  }
+  .fplns-comment:focus { border-color: var(--accent); background: #fff; }
+  .fplns-text-input {
+    width: 100%; min-height: 48px; border: 2px solid var(--border);
+    border-radius: 12px; font-size: 16px; padding: 12px;
+    color: var(--text); background: var(--bg); outline: none;
+    font-family: inherit; touch-action: manipulation;
+  }
+  .fplns-text-input:focus { border-color: var(--accent); background: #fff; }
+
   /* ── Report Card ── */
   .report-card {
     background: var(--card); border-radius: 16px;
@@ -448,7 +465,8 @@ var GRADE_CONFIG = {
     classes: [
       { label: 'Red',    tab: 'G7 Red'    },
       { label: 'Blue',   tab: 'G7 Blue'   },
-      { label: 'Yellow', tab: 'G7 Yellow' }
+      { label: 'Yellow', tab: 'G7 Yellow' },
+      { label: 'FPLNS',  tab: 'G7 FPLNS', fplns: true }
     ]
   },
   'G8': {
@@ -457,7 +475,7 @@ var GRADE_CONFIG = {
       { label: 'Red',    tab: 'G8 Red'    },
       { label: 'Blue',   tab: 'G8 Blue'   },
       { label: 'Yellow', tab: 'G8 Yellow' },
-      { label: 'Ext',    tab: 'G8 Ext'    }
+      { label: 'FPLNS',  tab: 'G8 FPLNS', fplns: true }
     ]
   },
   'G9': {
@@ -596,7 +614,8 @@ var state = {
   subject: null,
   students: [],
   sheetData: null,
-  profile: null
+  profile: null,
+  isFplns: false
 };
 var tokenClient;
 
@@ -798,6 +817,7 @@ function selectGrade(grade) {
   state.tabName = null;
   state.spreadsheetId = null;
   state.subject = null;
+  state.isFplns = false;
   updateBreadcrumb();
   renderClasses();
   goTo('stream');
@@ -807,7 +827,7 @@ function selectGrade(grade) {
 function renderClasses() {
   var grid = document.getElementById('stream-grid');
   grid.innerHTML = '';
-  var colors = { Red:'#e74c3c', Blue:'#3498db', Yellow:'#f39c12' };
+  var colors = { Red:'#e74c3c', Blue:'#3498db', Yellow:'#f39c12', FPLNS:'#8e44ad' };
   GRADE_CONFIG[state.grade].classes.forEach(function(cls) {
     var card = document.createElement('div');
     card.className = 'choice-card';
@@ -824,6 +844,7 @@ function selectClass(cls) {
   state.tabName = cls.tab;
   state.spreadsheetId = gradeCfg.spreadsheetId;
   state.subject = null;
+  state.isFplns = !!cls.fplns;
   updateBreadcrumb();
   renderSubjects();
   goTo('subject');
@@ -831,6 +852,10 @@ function selectClass(cls) {
 
 // ── Screen 3: Subjects ────────────────────────────────────────
 function renderSubjects() {
+  if (state.isFplns) {
+    renderFplnsSubjects();
+    return;
+  }
   var list = document.getElementById('subject-list');
   list.innerHTML = '';
   var allowedCodes = (state.profile && state.profile.subjects)
@@ -877,9 +902,201 @@ function subjectDisplayName(subj, grade) {
 }
 
 function selectSubject(subj) {
-  // Store a copy with the resolved (grade-aware) name so title/breadcrumb match the tile
-  state.subject = Object.assign({}, subj, { name: subjectDisplayName(subj, state.grade) });
+  if (state.isFplns) {
+    state.subject = subj;
+  } else {
+    state.subject = Object.assign({}, subj, { name: subjectDisplayName(subj, state.grade) });
+  }
   updateBreadcrumb(); loadMarks(); goTo('marks');
+}
+
+// ── FPLNS (Functional Literacy & Numeracy) ────────────────────
+function parseFplnsSubjectsFromHeader(headerRow) {
+  var subjects = [];
+  var seenGmName = false;
+  var seenGmRem = false;
+  for (var i = 0; i < headerRow.length; i++) {
+    var h = (headerRow[i] || '').toString().trim();
+    if (!h) continue;
+    if (/\s[—\-]\s*Level\s*$/i.test(h)) {
+      var name = h.replace(/\s*[—\-]\s*Level\s*$/i, '').trim();
+      subjects.push({
+        name: name,
+        code: 'FPLNS_L' + i,
+        type: 'fplns',
+        levelCol: i,
+        commentCol: i + 1
+      });
+    } else if (!seenGmName && h.indexOf('Grade Master') !== -1 && h.indexOf('Full Name') !== -1) {
+      seenGmName = true;
+      subjects.push({
+        name: 'Grade Master — Full Name',
+        code: 'FPLNS_GM_NAME',
+        type: 'fplns_text',
+        textCol: i
+      });
+    } else if (!seenGmRem && h.indexOf('Grade Master') !== -1 && h.indexOf('Remarks') !== -1) {
+      seenGmRem = true;
+      subjects.push({
+        name: 'Grade Master — Remarks',
+        code: 'FPLNS_GM_REM',
+        type: 'fplns_text',
+        textCol: i
+      });
+    }
+  }
+  return subjects;
+}
+
+function renderFplnsSubjects() {
+  var list = document.getElementById('subject-list');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div>Loading subjects...</div>';
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'read',
+      token: accessToken,
+      spreadsheetId: state.spreadsheetId,
+      tab: state.tabName,
+      grade: state.grade,
+      classLabel: state.classLabel,
+      subjectCode: '',
+      subjectName: 'FPLNS'
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (data.error) { showToast('Error: ' + data.error, 'error'); list.innerHTML = ''; return; }
+    var rows = data.values || [];
+    if (rows.length < 1) { showToast('Sheet data not found', 'error'); list.innerHTML = ''; return; }
+    var sheetWidth = getSheetWidth(rows, data.lastCol);
+    var headerRow = padRow(rows[0], sheetWidth);
+    var subjects = parseFplnsSubjectsFromHeader(headerRow);
+    if (subjects.length === 0) {
+      showToast('No subjects found on this sheet', 'error');
+      list.innerHTML = '';
+      return;
+    }
+    state.fplnsSubjects = subjects;
+    list.innerHTML = '';
+    subjects.forEach(function(subj) {
+      var item = document.createElement('div');
+      item.className = 'subject-item';
+      item.innerHTML =
+        '<span class="subject-name">' + subj.name + '</span>' +
+        '<span class="subject-type type-mark">Subject</span>';
+      item.onclick = function(){ selectSubject(subj); };
+      list.appendChild(item);
+    });
+  })
+  .catch(function(){ showToast('Failed to load. Check connection.', 'error'); list.innerHTML = ''; });
+}
+
+function fplnsLevelClass(val) {
+  if (val === 'Proficient') return 'selected-p';
+  if (val === 'Intermediate') return 'selected-i';
+  if (val === 'Basic') return 'selected-b';
+  return '';
+}
+
+function selectFplnsLevel(btn) {
+  var group = btn.parentElement;
+  group.dataset.touched = 'true';
+  group.querySelectorAll('.pib-btn').forEach(function(b){
+    b.classList.remove('selected-p','selected-i','selected-b');
+  });
+  var v = btn.dataset.val;
+  btn.classList.add(fplnsLevelClass(v));
+}
+
+function onFplnsCommentInput(input) {
+  input.dataset.touched = 'true';
+}
+
+function onFplnsTextInput(input) {
+  input.dataset.touched = 'true';
+}
+
+function parseFplnsAndRender(rows, lastColHint) {
+  if (rows.length < 2) { showToast('Sheet data not found', 'error'); return; }
+  var sheetWidth = getSheetWidth(rows, lastColHint);
+  var headerRow = padRow(rows[0], sheetWidth);
+  var nameCol = 0;
+  for (var c = 0; c < headerRow.length; c++) {
+    if (String(headerRow[c] || '').trim().toLowerCase() === 'student name') {
+      nameCol = c;
+      break;
+    }
+  }
+  var subj = state.subject;
+  var students = [];
+  for (var i = 1; i < rows.length; i++) {
+    var row = padRow(rows[i], sheetWidth);
+    var name = (row[nameCol] || '').toString().trim();
+    if (!name) continue;
+    if (subj.type === 'fplns') {
+      students.push({
+        name: name,
+        rowIndex: i,
+        levelValue: (row[subj.levelCol] || '').toString().trim(),
+        commentValue: (row[subj.commentCol] || '').toString().trim()
+      });
+    } else {
+      students.push({
+        name: name,
+        rowIndex: i,
+        textValue: (row[subj.textCol] || '').toString().trim()
+      });
+    }
+  }
+  state.students = students;
+  state.sheetData = { headerRow: headerRow, nameCol: nameCol, isFplns: true };
+  document.getElementById('marks-sub').textContent =
+    classDisplayName() + ' · ' + students.length + ' students';
+  renderFplnsStudentRows(students);
+  document.getElementById('btn-submit').disabled = students.length === 0;
+  if (students.length === 0) showToast('No students found', 'error');
+}
+
+function renderFplnsStudentRows(students) {
+  var container = document.getElementById('student-list-container');
+  container.innerHTML = '';
+  var list = document.createElement('div');
+  list.className = 'student-list';
+  var subj = state.subject;
+
+  students.forEach(function(student, idx) {
+    var row = document.createElement('div');
+    row.className = 'student-row fplns-student-block';
+    var inputHtml = '';
+
+    if (subj.type === 'fplns') {
+      var lv = student.levelValue;
+      var cmtPh = escapeAttr(student.commentValue);
+      var selB = fplnsLevelClass(lv) === 'selected-b' ? 'selected-b' : '';
+      var selI = fplnsLevelClass(lv) === 'selected-i' ? 'selected-i' : '';
+      var selP = fplnsLevelClass(lv) === 'selected-p' ? 'selected-p' : '';
+      inputHtml =
+        '<div class="fplns-label">Level</div>' +
+        '<div class="pib-buttons fplns-level-buttons" data-sheet-value="' + escapeAttr(lv) + '" data-touched="false">' +
+          '<button type="button" class="pib-btn ' + selB + '" data-val="Basic" onclick="selectFplnsLevel(this)">Basic</button>' +
+          '<button type="button" class="pib-btn ' + selI + '" data-val="Intermediate" onclick="selectFplnsLevel(this)">Intermediate</button>' +
+          '<button type="button" class="pib-btn ' + selP + '" data-val="Proficient" onclick="selectFplnsLevel(this)">Proficient</button>' +
+        '</div>' +
+        '<div class="fplns-label">Comment</div>' +
+        '<textarea class="fplns-comment" placeholder="' + cmtPh + '" data-sheet-value="' + cmtPh + '" data-touched="false" oninput="onFplnsCommentInput(this)"></textarea>';
+    } else {
+      var txtPh = escapeAttr(student.textValue);
+      inputHtml =
+        '<textarea class="fplns-text-input" placeholder="' + txtPh + '" data-sheet-value="' + txtPh + '" data-touched="false" oninput="onFplnsTextInput(this)"></textarea>';
+    }
+
+    row.innerHTML =
+      '<div class="student-name"><span class="student-num">' + (idx + 1) + '</span>' + student.name + '</div>' +
+      inputHtml;
+    list.appendChild(row);
+  });
+  container.appendChild(list);
 }
 
 // ── Screen 4: Load Marks ──────────────────────────────────────
@@ -906,7 +1123,11 @@ function loadMarks() {
   .then(function(r){ return r.json(); })
   .then(function(data) {
     if (data.error) { showToast('Error: ' + data.error, 'error'); return; }
-    parseAndRender(data.values || [], data.lastCol);
+    if (state.isFplns) {
+      parseFplnsAndRender(data.values || [], data.lastCol);
+    } else {
+      parseAndRender(data.values || [], data.lastCol);
+    }
   })
   .catch(function(){ showToast('Failed to load. Check connection.', 'error'); });
 }
@@ -1339,10 +1560,10 @@ function submitMarks() {
   btn.disabled = true; btn.textContent = 'Saving...';
 
   var subj    = state.subject;
-  var subjCol = state.sheetData.subjCol; // 0-indexed → Apps Script needs 1-indexed
-  var col1    = subjCol + 1;
+  var subjCol = state.sheetData && state.sheetData.subjCol;
+  var col1    = subjCol !== undefined ? subjCol + 1 : 0;
   var invalidInputs = document.querySelectorAll('.mark-input.invalid');
-  if (invalidInputs.length > 0) {
+  if (!state.isFplns && subj.type === 'mark' && invalidInputs.length > 0) {
     btn.disabled = false;
     btn.textContent = '✓ Save Marks';
     showToast('Fix invalid marks before saving.', 'error');
@@ -1350,7 +1571,37 @@ function submitMarks() {
   }
 
   var updates = [];
-  if (subj.type === 'mark') {
+  if (state.isFplns && subj.type === 'fplns') {
+    document.querySelectorAll('.fplns-student-block').forEach(function(block, i) {
+      var levelGroup = block.querySelector('.fplns-level-buttons');
+      var commentInput = block.querySelector('.fplns-comment');
+      if (levelGroup && levelGroup.dataset.touched === 'true') {
+        var sel = levelGroup.querySelector('.pib-btn.selected-p, .pib-btn.selected-i, .pib-btn.selected-b');
+        var val = sel ? sel.dataset.val : '';
+        updates.push({
+          row: state.students[i].rowIndex + 1,
+          col: subj.levelCol + 1,
+          value: val
+        });
+      }
+      if (commentInput && commentInput.dataset.touched === 'true') {
+        updates.push({
+          row: state.students[i].rowIndex + 1,
+          col: subj.commentCol + 1,
+          value: commentInput.value.trim()
+        });
+      }
+    });
+  } else if (state.isFplns && subj.type === 'fplns_text') {
+    document.querySelectorAll('.fplns-text-input').forEach(function(input, i) {
+      if (input.dataset.touched !== 'true') return;
+      updates.push({
+        row: state.students[i].rowIndex + 1,
+        col: subj.textCol + 1,
+        value: input.value.trim()
+      });
+    });
+  } else if (subj.type === 'mark') {
     document.querySelectorAll('.mark-input').forEach(function(input, i) {
       if (input.dataset.touched !== 'true') return;
       var val = markValueToSave(input);
