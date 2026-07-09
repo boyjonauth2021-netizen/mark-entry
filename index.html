@@ -222,6 +222,7 @@
     display: grid; grid-template-columns: 1fr 1fr 1fr;
     border-bottom: 1px solid var(--border);
   }
+  .rc-stats-single { grid-template-columns: 1fr; }
   .rc-stat {
     padding: 10px 12px; border-right: 1px solid var(--border); text-align: center;
   }
@@ -1488,6 +1489,7 @@ function renderReportCardRow(cardEl, student, idx) {
     subjRowsHtml = '<div class="rc-subj-row" style="color:var(--muted);font-style:italic">No marks entered yet</div>';
   }
 
+  var statsClass = 'rc-stats';
   var statsHtml;
   if (state.grade === 'G10' || state.grade === 'G11') {
     var aggCol = colMap['AGGREGATE'];
@@ -1499,6 +1501,11 @@ function renderReportCardRow(cardEl, student, idx) {
       '<div class="rc-stat"><div class="rc-stat-label">Aggregate</div><div class="rc-stat-value">' + aggVal + '</div></div>' +
       '<div class="rc-stat"><div class="rc-stat-label">Pass / Fail</div><div class="rc-stat-value">' + passFailVal + '</div></div>' +
       '<div class="rc-stat"><div class="rc-stat-label">Abs / Late</div><div class="rc-stat-value" style="font-size:14px">' + absVal + ' / ' + lateVal + '</div></div>';
+  } else if (state.grade === 'G12' || state.grade === 'G13') {
+    var passFailOnly = result || '—';
+    statsClass = 'rc-stats rc-stats-single';
+    statsHtml =
+      '<div class="rc-stat"><div class="rc-stat-label">Pass / Fail</div><div class="rc-stat-value">' + passFailOnly + '</div></div>';
   } else {
     var perRaw  = row[colMap['PER']];
     var perVal  = (perRaw !== '' && perRaw !== undefined && perRaw !== null && !isNaN(parseFloat(perRaw)))
@@ -1519,7 +1526,7 @@ function renderReportCardRow(cardEl, student, idx) {
       '<span class="rc-name"><span style="background:rgba(255,255,255,0.2);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-right:10px;">' + (idx+1) + '</span>' + student.name + '</span>' +
       '<span class="rc-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
     '</div>' +
-    '<div class="rc-stats">' + statsHtml + '</div>' +
+    '<div class="' + statsClass + '">' + statsHtml + '</div>' +
     '<div class="rc-subjects">' + subjRowsHtml + '</div>' +
     '<div class="rc-remark-wrap">' +
       '<div class="rc-remark-label">Form Teacher\'s Remark</div>' +
