@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<!-- DEPLOY: 1) script.google.com → New project → paste report-generator.gs
+     2) Deploy → New deployment → Web app → Execute as: Me → Anyone → Deploy
+     3) Copy URL into REPORT_SCRIPT_URL below
+     4) Upload this file to GitHub Pages (same repo as index.html) -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Report Sheet Generator — BRSSS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --ink: #1B2430;
+    --ink-2: #212B39;
+    --card: #232E3D;
+    --card-hi: #2A3648;
+    --rule: #374255;
+    --paper: #E8E1D0;
+    --text: #DDE2E8;
+    --text-dim: #8C93A0;
+    --text-faint: #5D6472;
+    --brass: #C9A227;
+    --brass-dim: #7A6520;
+    --ox: #C24B4B;
+    --ok: #8FBF7A;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 0 14px 2rem; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 14px 0 10px;
+  }
+  h1 {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 19px;
+    margin: 0;
+    color: var(--paper);
+  }
+  .subtitle {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 2px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--rule);
+    color: var(--text-dim);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .icon-btn:active { background: var(--card-hi); }
+
+  #login-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+  #login-screen h2 {
+    font-family: 'Source Serif 4', serif;
+    color: var(--paper);
+    font-size: 22px;
+    margin: 0 0 8px;
+  }
+  #login-screen p {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0 0 24px;
+    max-width: 300px;
+    line-height: 1.5;
+  }
+  #btn-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  #btn-login:disabled { opacity: 0.6; cursor: default; }
+  #btn-login img { width: 18px; height: 18px; }
+
+  #main-app { display: none; padding-top: 12px; }
+
+  .section-label {
+    font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px;
+  }
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    color: var(--text-dim);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .chip:active { background: var(--card-hi); }
+  .chip.selected {
+    background: var(--brass-dim);
+    border-color: var(--brass);
+    color: var(--paper);
+  }
+  .chip:disabled { opacity: 0.4; cursor: default; }
+
+  .generate-wrap { margin-top: 28px; }
+  #btn-generate {
+    width: 100%;
+    background: var(--brass-dim);
+    border: 1px solid var(--brass);
+    color: var(--paper);
+    padding: 14px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  #btn-generate:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  #btn-generate:not(:disabled):active { filter: brightness(1.1); }
+
+  .status-panel {
+    margin-top: 16px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: none;
+  }
+  .status-panel.visible { display: block; }
+  .status-panel .msg {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .status-panel.ok .msg { color: var(--ok); }
+  .status-panel.err .msg { color: var(--ox); }
+  .status-panel a {
+    color: var(--brass);
+    word-break: break-all;
+  }
+  .spinner-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--rule);
+    border-top-color: var(--brass);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .selection-hint {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card-hi);
+    border: 1px solid var(--rule);
+    color: var(--text);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 100;
+    transition: transform 0.25s;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--ox); color: #E8A2A2; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="login-screen">
+    <h2>Report Sheet Generator</h2>
+    <p>Sign in with your school Google account. Access is restricted to administrators.</p>
+    <button id="btn-login" onclick="signIn()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+      Sign in with Google
+    </button>
+  </div>
+
+  <div id="main-app">
+    <header class="top">
+      <div class="title-row">
+        <div>
+          <h1>Report Sheet Generator</h1>
+          <div class="subtitle" id="welcome-text">Term 2 final reports</div>
+        </div>
+        <button class="icon-btn" onclick="signOut()" title="Sign out">&#x2715;</button>
+      </div>
+    </header>
+
+    <div class="section-label">Grade</div>
+    <div class="chip-row" id="grade-chips"></div>
+
+    <div class="section-label">Class</div>
+    <div class="chip-row" id="class-chips"></div>
+    <div class="selection-hint" id="selection-hint">Select a grade and class</div>
+
+    <div class="generate-wrap">
+      <button id="btn-generate" disabled onclick="generateReport()">Generate Report PDF</button>
+    </div>
+
+    <div class="status-panel" id="status-panel">
+      <div id="status-content"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var CLIENT_ID = '920543301524-69idp58am0pr3fnqf4etlghehirakp17.apps.googleusercontent.com';
+var REPORT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDHZhkigGARLI-tNSR-z7m43TWkvUOYU9ClYSQTykZ0DS8W8YF9lPBGz1VaB7f4Bs0ug/exec';
+var SCOPES = 'openid email profile';
+var accessToken = null;
+var tokenClient = null;
+var signingIn = false;
+
+var SPREADSHEET_G7G8   = '1xZWPBK2CD0KwT2JAJubl5J7skHO3rZDX8F8Cs5_o4Dw';
+var SPREADSHEET_G9     = '1-4pkmA_7B1dVgK_nF9sXB5Ch00EPRA97NWk2hx1APn8';
+var SPREADSHEET_G10G11 = '1WdXJom9i_a0JA3OadNn5HraZvfrO-lETBydYNdQBfL0';
+var SPREADSHEET_G12G13 = '1y0SjWbd0mMpP5AHYYe1KJa0ej6Z0K-_xeN3cnQhoK6A';
+
+var GRADE_CONFIG = {
+  'G7': {
+    spreadsheetId: SPREADSHEET_G7G8,
+    classes: [
+      { label: 'Red',    tab: 'G7 Red'    },
+      { label: 'Blue',   tab: 'G7 Blue'   },
+      { label: 'Yellow', tab: 'G7 Yellow' }
+    ]
+  },
+  'G8': {
+    spreadsheetId: SPREADSHEET_G7G8,
+    classes: [
+      { label: 'Red',    tab: 'G8 Red'    },
+      { label: 'Blue',   tab: 'G8 Blue'   },
+      { label: 'Yellow', tab: 'G8 Yellow' }
+    ]
+  },
+  'G9': {
+    spreadsheetId: SPREADSHEET_G9,
+    classes: [
+      { label: 'Red',    tab: 'G9 Red'    },
+      { label: 'Blue',   tab: 'G9 Blue'   },
+      { label: 'Yellow', tab: 'G9 Yellow' }
+    ]
+  },
+  'G10': {
+    spreadsheetId: SPREADSHEET_G10G11,
+    classes: [
+      { label: 'Art',  tab: 'G10 Art'  },
+      { label: 'Eco1', tab: 'G10 Eco1' },
+      { label: 'Eco2', tab: 'G10 Eco2' },
+      { label: 'ST',   tab: 'G10 ST'   }
+    ]
+  },
+  'G11': {
+    spreadsheetId: SPREADSHEET_G10G11,
+    classes: [
+      { label: 'Art',  tab: 'G11 Art'  },
+      { label: 'Eco1', tab: 'G11 Eco1' },
+      { label: 'Eco2', tab: 'G11 Eco2' },
+      { label: 'ST',   tab: 'G11 ST'   }
+    ]
+  },
+  'G12': {
+    spreadsheetId: SPREADSHEET_G12G13,
+    classes: [
+      { label: 'Eco', tab: 'G12 Eco' },
+      { label: 'ST',  tab: 'G12 ST'  }
+    ]
+  },
+  'G13': {
+    spreadsheetId: SPREADSHEET_G12G13,
+    classes: [
+      { label: 'Eco', tab: 'G13 Eco' },
+      { label: 'ST',  tab: 'G13 ST'  }
+    ]
+  }
+};
+
+var state = { grade: null, classLabel: null, tab: null, spreadsheetId: null };
+
+window.onload = function() {
+  var saved = sessionStorage.getItem('userInfo');
+  var savedProfile = sessionStorage.getItem('teacherProfile');
+  if (saved && savedProfile && sessionStorage.getItem('accessToken')) {
+    accessToken = sessionStorage.getItem('accessToken');
+    showApp(JSON.parse(saved), JSON.parse(savedProfile));
+  }
+};
+
+function setLoginBusy(busy) {
+  var btn = document.getElementById('btn-login');
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.innerHTML = busy
+    ? 'Signing in\u2026'
+    : '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"> Sign in with Google';
+}
+
+function signIn() {
+  if (!REPORT_SCRIPT_URL) {
+    showToast('REPORT_SCRIPT_URL not configured — deploy report-generator.gs first', 'error');
+    return;
+  }
+  if (signingIn) return;
+  signingIn = true;
+  setLoginBusy(true);
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: function(response) {
+      if (response.error) {
+        showToast('Sign in failed', 'error');
+        signingIn = false;
+        setLoginBusy(false);
+        return;
+      }
+      accessToken = response.access_token;
+      sessionStorage.setItem('accessToken', accessToken);
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(user) {
+        fetchProfile(function(profile) {
+          if (profile.error) {
+            showToast(profile.error, 'error');
+            sessionStorage.clear();
+            accessToken = null;
+            signingIn = false;
+            setLoginBusy(false);
+            return;
+          }
+          sessionStorage.setItem('userInfo', JSON.stringify(user));
+          sessionStorage.setItem('teacherProfile', JSON.stringify(profile));
+          signingIn = false;
+          setLoginBusy(false);
+          showApp(user, profile);
+        });
+      })
+      .catch(function() {
+        showToast('Sign in failed. Check connection.', 'error');
+        signingIn = false;
+        setLoginBusy(false);
+      });
+    }
+  });
+  tokenClient.requestAccessToken();
+}
+
+function fetchProfile(callback) {
+  fetch(REPORT_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'getProfile', token: accessToken })
+  })
+  .then(function(r) { return r.json(); })
+  .then(callback)
+  .catch(function() { callback({ error: 'Connection error. Please try again.' }); });
+}
+
+function showApp(user, profile) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+
+  var welcome = document.getElementById('welcome-text');
+  if (profile && (profile.name || profile.surname)) {
+    welcome.textContent = 'Welcome, ' + [profile.name, profile.surname].filter(Boolean).join(' ');
+  }
+
+  renderGrades();
+  updateGenerateButton();
+}
+
+function signOut() {
+  sessionStorage.clear();
+  accessToken = null;
+  state = { grade: null, classLabel: null, tab: null, spreadsheetId: null };
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  hideStatus();
+}
+
+function renderGrades() {
+  var container = document.getElementById('grade-chips');
+  container.innerHTML = '';
+  Object.keys(GRADE_CONFIG).forEach(function(g) {
+    var chip = document.createElement('button');
+    chip.className = 'chip' + (state.grade === g ? ' selected' : '');
+    chip.textContent = g;
+    chip.onclick = function() { selectGrade(g); };
+    container.appendChild(chip);
+  });
+  renderClasses();
+}
+
+function selectGrade(grade) {
+  state.grade = grade;
+  state.classLabel = null;
+  state.tab = null;
+  state.spreadsheetId = GRADE_CONFIG[grade].spreadsheetId;
+  renderGrades();
+  updateGenerateButton();
+  updateHint();
+}
+
+function renderClasses() {
+  var container = document.getElementById('class-chips');
+  container.innerHTML = '';
+  if (!state.grade) {
+    container.innerHTML = '<span class="selection-hint">Choose a grade first</span>';
+    return;
+  }
+  GRADE_CONFIG[state.grade].classes.forEach(function(cls) {
+    var chip = document.createElement('button');
+    chip.className = 'chip' + (state.classLabel === cls.label ? ' selected' : '');
+    chip.textContent = cls.label;
+    chip.onclick = function() { selectClass(cls); };
+    container.appendChild(chip);
+  });
+}
+
+function selectClass(cls) {
+  state.classLabel = cls.label;
+  state.tab = cls.tab;
+  renderClasses();
+  updateGenerateButton();
+  updateHint();
+}
+
+function updateHint() {
+  var hint = document.getElementById('selection-hint');
+  if (state.grade && state.classLabel) {
+    hint.textContent = state.grade + ' ' + state.classLabel + ' (' + state.tab + ')';
+  } else if (state.grade) {
+    hint.textContent = state.grade + ' — select a class';
+  } else {
+    hint.textContent = 'Select a grade and class';
+  }
+}
+
+function updateGenerateButton() {
+  var btn = document.getElementById('btn-generate');
+  btn.disabled = !(state.grade && state.classLabel && state.tab);
+}
+
+function generateReport() {
+  if (!REPORT_SCRIPT_URL) {
+    showToast('REPORT_SCRIPT_URL not configured', 'error');
+    return;
+  }
+  if (!state.grade || !state.tab) return;
+
+  var btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  showStatusLoading('Generating PDF for ' + state.tab + '\u2026');
+
+  fetch(REPORT_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'generateReport',
+      token: accessToken,
+      grade: state.grade,
+      classLabel: state.classLabel,
+      tab: state.tab,
+      spreadsheetId: state.spreadsheetId
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    if (data.error) {
+      showStatusError(data.error);
+      return;
+    }
+    showStatusSuccess(data);
+  })
+  .catch(function() {
+    btn.disabled = false;
+    showStatusError('Connection error. Please try again.');
+  });
+}
+
+function showStatusLoading(msg) {
+  var panel = document.getElementById('status-panel');
+  var content = document.getElementById('status-content');
+  panel.className = 'status-panel visible';
+  content.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><span>' + msg + '</span></div>';
+}
+
+function showStatusError(msg) {
+  var panel = document.getElementById('status-panel');
+  var content = document.getElementById('status-content');
+  panel.className = 'status-panel visible err';
+  content.innerHTML = '<div class="msg">' + escapeHtml(msg) + '</div>';
+}
+
+function showStatusSuccess(data) {
+  var panel = document.getElementById('status-panel');
+  var content = document.getElementById('status-content');
+  panel.className = 'status-panel visible ok';
+  content.innerHTML =
+    '<div class="msg">PDF saved: <strong>' + escapeHtml(data.fileName) + '</strong><br>' +
+    data.studentCount + ' student' + (data.studentCount === 1 ? '' : 's') + '<br><br>' +
+    '<a href="' + escapeHtml(data.fileUrl) + '" target="_blank" rel="noopener">Open in Google Drive</a></div>';
+}
+
+function hideStatus() {
+  document.getElementById('status-panel').className = 'status-panel';
+}
+
+function showToast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type === 'error' ? ' error' : '');
+  setTimeout(function() { el.className = 'toast'; }, 4000);
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
