@@ -1,0 +1,32 @@
+{
+  "name": "Report Generator — BRSSS",
+  "short_name": "Reports",
+  "description": "Admin report sheet PDF generator",
+  "start_url": "/mark-entry/report-generator.html",
+  "scope": "/mark-entry/report-generator.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1B2430",
+  "theme_color": "#1B2430",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "icons/report-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/report-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/report-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
