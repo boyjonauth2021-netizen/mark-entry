@@ -360,6 +360,7 @@
     Sign in with Google
   </button>
   <div class="login-note">Only authorised school accounts can access this system</div>
+  <div class="login-note" style="margin-top:6px; opacity:0.7;">&copy; Mr Boyjonauth</div>
 </div>
 
 <!-- ── Main App ── -->
@@ -1171,6 +1172,68 @@ function findCodeRowIndex(rows, sheetWidth) {
   return 2;
 }
 
+// G10/G11: sheet grades live in AI–BG (headers row 2, values on student rows)
+var GRADE_BLOCK_START_COL = 34; // column AI
+
+function normalizeSubjectLabel(name) {
+  var s = String(name || '').toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (s === 'maths') return 'mathematics';
+  if (s === 'computer studies') return 'ict';
+  if (s === 'visual art') return 'art and design';
+  return s;
+}
+
+function findGradeHeaderRow(rows, sheetWidth, codeRowIndex) {
+  for (var r = 0; r <= codeRowIndex; r++) {
+    var row = padRow(rows[r], sheetWidth);
+    if (normalizeSubjectLabel(row[GRADE_BLOCK_START_COL]) === 'english') return row;
+  }
+  return null;
+}
+
+function isGradeHeaderLabel(label) {
+  if (!label) return false;
+  if (label.indexOf('form master') >= 0 || label.indexOf('remark') >= 0) return false;
+  if (label.indexOf('no of') === 0 || label.indexOf('credit') >= 0) return false;
+  return true;
+}
+
+function buildGradeColMap(rows, sheetWidth, codeRowIndex, displayRow, subjColMap, grade) {
+  if (grade !== 'G10' && grade !== 'G11') return {};
+  var gradeHeaderRow = findGradeHeaderRow(rows, sheetWidth, codeRowIndex);
+  if (!gradeHeaderRow) return {};
+
+  var nameToGradeCol = {};
+  for (var c = GRADE_BLOCK_START_COL; c < gradeHeaderRow.length; c++) {
+    var label = normalizeSubjectLabel(gradeHeaderRow[c]);
+    if (!isGradeHeaderLabel(label)) continue;
+    nameToGradeCol[label] = c;
+  }
+
+  var gradeColMap = {};
+  Object.keys(subjColMap).forEach(function(code) {
+    if (!code.match(/^SUBJ\d+$/)) return;
+    var markName = normalizeSubjectLabel(displayRow[subjColMap[code]]);
+    if (markName && nameToGradeCol[markName] !== undefined) {
+      gradeColMap[code] = nameToGradeCol[markName];
+    }
+  });
+  return gradeColMap;
+}
+
+function formatSheetGrade(raw) {
+  if (raw === null || raw === undefined || raw === '') return '—';
+  var s = String(raw).trim();
+  if (s === '') return '—';
+  var n = parseFloat(s);
+  if (!isNaN(n)) return String(n === Math.floor(n) ? Math.floor(n) : n);
+  return s;
+}
+
 // Empty = does not take subject. 0 or any value = takes subject / show entry.
 function isActiveSubjectCell(raw) {
   if (raw === null || raw === undefined) return false;
@@ -1276,12 +1339,15 @@ function parseAndRender(rows, lastColHint) {
     students.push(student);
   }
 
+  var gradeColMap = buildGradeColMap(rows, sheetWidth, codeRowIndex, displayRow, subjColMap, state.grade);
+
   state.students  = students;
   state.sheetData = {
-    codeRow:    codeRow,
-    displayRow: displayRow,
-    subjCol:    subjCol,
-    colMap:     subjColMap
+    codeRow:     codeRow,
+    displayRow:  displayRow,
+    subjCol:     subjCol,
+    colMap:      subjColMap,
+    gradeColMap: gradeColMap
   };
 
   document.getElementById('marks-sub').textContent =
@@ -1428,9 +1494,11 @@ function gradeInfo(pct) {
 }
 
 function renderReportCardRow(cardEl, student, idx) {
-  var colMap    = state.sheetData.colMap;
-  var dispRow   = state.sheetData.displayRow;
-  var row       = student.fullRow;
+  var colMap      = state.sheetData.colMap;
+  var dispRow     = state.sheetData.displayRow;
+  var gradeColMap = state.sheetData.gradeColMap || {};
+  var row         = student.fullRow;
+  var isSenior    = state.grade === 'G10' || state.grade === 'G11';
 
   var result  = ((row[colMap['PASS_FAIL']] || '')).toString().trim().toUpperCase();
   var absRaw  = row[colMap['absences'] !== undefined ? colMap['absences'] : colMap['ABSENCES']];
@@ -1473,15 +1541,27 @@ function renderReportCardRow(cardEl, student, idx) {
     var numMark = Math.floor(parseFloat(markStr));
     if (isNaN(numMark)) return;
     var maxMark = getMaxMark(code, state.grade) || 100;
-    var pct     = (numMark / maxMark) * 100;
-    var gi      = gradeInfo(pct);
+
+    var gradeDisp, remarkDisp, remarkCls;
+    if (isSenior) {
+      gradeDisp  = gradeColMap[code] !== undefined
+                   ? formatSheetGrade(row[gradeColMap[code]]) : '—';
+      remarkDisp = '—';
+      remarkCls  = '';
+    } else {
+      var pct = (numMark / maxMark) * 100;
+      var gi  = gradeInfo(pct);
+      gradeDisp  = gi.grade;
+      remarkDisp = gi.remark;
+      remarkCls  = gi.cls;
+    }
 
     subjRowsHtml += '<div class="rc-subj-row">' +
       '<span class="rc-subj-name">' + dispName + '</span>' +
       '<span class="rc-subj-mark">' + numMark + '<span style="font-size:9px;font-weight:400;color:#aaa">/' + maxMark + '</span></span>' +
-      '<span class="rc-subj-grade">' + gi.grade + '</span>' +
+      '<span class="rc-subj-grade">' + gradeDisp + '</span>' +
       '<span class="rc-subj-rank">' + rankDisp + '</span>' +
-      '<span class="rc-subj-remark ' + gi.cls + '">' + gi.remark + '</span>' +
+      '<span class="rc-subj-remark ' + remarkCls + '">' + remarkDisp + '</span>' +
       '</div>';
   });
 
