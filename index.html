@@ -246,6 +246,7 @@
   .rc-rem-4 { color: #c9a84c; }
   .rc-rem-5 { color: #e07a30; }
   .rc-rem-6 { color: #c0392b; }
+  .rc-rem-7 { color: #8b0000; }
   .rc-rem-pi { color: #1a7a4a; }
   .rc-absent { padding: 6px 14px 8px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
   .rc-remark-wrap { padding: 12px 14px 14px; border-top: 2px solid var(--border); background: #f8faff; }
@@ -1485,12 +1486,13 @@ function getMaxMark(code, grade) {
 }
 
 function gradeInfo(pct) {
-  if (pct >= 90) return { grade: '1', remark: 'Excellent',        cls: 'rc-rem-1' };
+  if (pct >= 85) return { grade: '1', remark: 'Excellent',        cls: 'rc-rem-1' };
   if (pct >= 75) return { grade: '2', remark: 'Very Good',        cls: 'rc-rem-2' };
-  if (pct >= 60) return { grade: '3', remark: 'Good',             cls: 'rc-rem-3' };
-  if (pct >= 50) return { grade: '4', remark: 'Average',          cls: 'rc-rem-4' };
-  if (pct >= 40) return { grade: '5', remark: 'Needs Improv.',    cls: 'rc-rem-5' };
-  return           { grade: '6', remark: 'Unsatisfactory',        cls: 'rc-rem-6' };
+  if (pct >= 65) return { grade: '3', remark: 'Good',             cls: 'rc-rem-3' };
+  if (pct >= 55) return { grade: '4', remark: 'Average',          cls: 'rc-rem-4' };
+  if (pct >= 45) return { grade: '5', remark: 'Needs Improv.',    cls: 'rc-rem-5' };
+  if (pct >= 35) return { grade: '6', remark: 'Unsatisfactory',   cls: 'rc-rem-6' };
+  return           { grade: '7', remark: 'Poor',                  cls: 'rc-rem-7' };
 }
 
 function renderReportCardRow(cardEl, student, idx) {
