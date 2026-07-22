@@ -1495,12 +1495,44 @@ function gradeInfo(pct) {
   return           { grade: '7', remark: 'Poor',                  cls: 'rc-rem-7' };
 }
 
+function upperMainGrade(mark) {
+  if (mark >= 180) return 'A+';
+  if (mark >= 160) return 'A';
+  if (mark >= 140) return 'B';
+  if (mark >= 120) return 'C';
+  if (mark >= 100) return 'D';
+  if (mark >= 80) return 'E';
+  if (mark >= 70) return 'AS';
+  if (mark >= 60) return 'U*';
+  return 'U';
+}
+
+function upperSubGrade(mark) {
+  if (mark >= 80) return 'a';
+  if (mark >= 70) return 'b';
+  if (mark >= 60) return 'c';
+  if (mark >= 50) return 'd';
+  if (mark >= 40) return 'e';
+  if (mark >= 30) return 'u*';
+  return 'u';
+}
+
+function upperGradeInfo(code, grade, numMark) {
+  var max = getMaxMark(code, grade) || 100;
+  return {
+    grade: max === 200 ? upperMainGrade(numMark) : upperSubGrade(numMark),
+    remark: '—',
+    cls: ''
+  };
+}
+
 function renderReportCardRow(cardEl, student, idx) {
   var colMap      = state.sheetData.colMap;
   var dispRow     = state.sheetData.displayRow;
   var gradeColMap = state.sheetData.gradeColMap || {};
   var row         = student.fullRow;
   var isSenior    = state.grade === 'G10' || state.grade === 'G11';
+  var isUpper     = state.grade === 'G12' || state.grade === 'G13';
 
   var result  = ((row[colMap['PASS_FAIL']] || '')).toString().trim().toUpperCase();
   var absRaw  = row[colMap['absences'] !== undefined ? colMap['absences'] : colMap['ABSENCES']];
@@ -1550,6 +1582,11 @@ function renderReportCardRow(cardEl, student, idx) {
                    ? formatSheetGrade(row[gradeColMap[code]]) : '—';
       remarkDisp = '—';
       remarkCls  = '';
+    } else if (isUpper) {
+      var ugi = upperGradeInfo(code, state.grade, numMark);
+      gradeDisp  = ugi.grade;
+      remarkDisp = ugi.remark;
+      remarkCls  = ugi.cls;
     } else {
       var pct = (numMark / maxMark) * 100;
       var gi  = gradeInfo(pct);
