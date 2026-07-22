@@ -1173,8 +1173,13 @@ function findCodeRowIndex(rows, sheetWidth) {
   return 2;
 }
 
-// G10/G11: sheet grades live in AI–BG (headers row 2, values on student rows)
-var GRADE_BLOCK_START_COL = 34; // column AI
+// G10: sheet grades in AI–BG (header with English at AI). G11: grades in AK–BK (English at AK).
+var GRADE_BLOCK_START_COL_G10 = 34; // AI
+var GRADE_BLOCK_START_COL_G11 = 36; // AK
+
+function getGradeBlockStartCol(grade) {
+  return grade === 'G11' ? GRADE_BLOCK_START_COL_G11 : GRADE_BLOCK_START_COL_G10;
+}
 
 function normalizeSubjectLabel(name) {
   var s = String(name || '').toLowerCase()
@@ -1188,10 +1193,12 @@ function normalizeSubjectLabel(name) {
   return s;
 }
 
-function findGradeHeaderRow(rows, sheetWidth, codeRowIndex) {
-  for (var r = 0; r <= codeRowIndex; r++) {
+function findGradeHeaderRow(rows, sheetWidth, codeRowIndex, startCol) {
+  // Prefer rows above the code row; also allow Excel row 4 (index 3) for G11 layouts
+  var last = Math.max(codeRowIndex, 3);
+  for (var r = 0; r <= last && r < rows.length; r++) {
     var row = padRow(rows[r], sheetWidth);
-    if (normalizeSubjectLabel(row[GRADE_BLOCK_START_COL]) === 'english') return row;
+    if (normalizeSubjectLabel(row[startCol]) === 'english') return row;
   }
   return null;
 }
@@ -1205,11 +1212,12 @@ function isGradeHeaderLabel(label) {
 
 function buildGradeColMap(rows, sheetWidth, codeRowIndex, displayRow, subjColMap, grade) {
   if (grade !== 'G10' && grade !== 'G11') return {};
-  var gradeHeaderRow = findGradeHeaderRow(rows, sheetWidth, codeRowIndex);
+  var startCol = getGradeBlockStartCol(grade);
+  var gradeHeaderRow = findGradeHeaderRow(rows, sheetWidth, codeRowIndex, startCol);
   if (!gradeHeaderRow) return {};
 
   var nameToGradeCol = {};
-  for (var c = GRADE_BLOCK_START_COL; c < gradeHeaderRow.length; c++) {
+  for (var c = startCol; c < gradeHeaderRow.length; c++) {
     var label = normalizeSubjectLabel(gradeHeaderRow[c]);
     if (!isGradeHeaderLabel(label)) continue;
     nameToGradeCol[label] = c;
