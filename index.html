@@ -1495,35 +1495,31 @@ function gradeInfo(pct) {
   return           { grade: '7', remark: 'Poor',                  cls: 'rc-rem-7' };
 }
 
-function upperMainGrade(mark) {
-  if (mark >= 180) return 'A+';
-  if (mark >= 160) return 'A';
-  if (mark >= 140) return 'B';
-  if (mark >= 120) return 'C';
-  if (mark >= 100) return 'D';
-  if (mark >= 80) return 'E';
-  if (mark >= 70) return 'AS';
-  if (mark >= 60) return 'U*';
-  return 'U';
+function upperMainGradeInfo(mark) {
+  if (mark >= 180) return { grade: 'A+', remark: 'Excellent',        cls: 'rc-rem-1' };
+  if (mark >= 160) return { grade: 'A',  remark: 'Excellent',        cls: 'rc-rem-1' };
+  if (mark >= 140) return { grade: 'B',  remark: 'Very Good',        cls: 'rc-rem-2' };
+  if (mark >= 120) return { grade: 'C',  remark: 'Good',             cls: 'rc-rem-3' };
+  if (mark >= 100) return { grade: 'D',  remark: 'Average',          cls: 'rc-rem-4' };
+  if (mark >= 80)  return { grade: 'E',  remark: 'Needs Improv.',    cls: 'rc-rem-5' };
+  if (mark >= 70)  return { grade: 'AS', remark: 'Borderline',       cls: 'rc-rem-5' };
+  if (mark >= 60)  return { grade: 'U*', remark: 'Unsatisfactory',   cls: 'rc-rem-6' };
+  return           { grade: 'U',  remark: 'Ungraded',               cls: 'rc-rem-7' };
 }
 
-function upperSubGrade(mark) {
-  if (mark >= 80) return 'a';
-  if (mark >= 70) return 'b';
-  if (mark >= 60) return 'c';
-  if (mark >= 50) return 'd';
-  if (mark >= 40) return 'e';
-  if (mark >= 30) return 'u*';
-  return 'u';
+function upperSubGradeInfo(mark) {
+  if (mark >= 80) return { grade: 'a',  remark: 'Excellent',        cls: 'rc-rem-1' };
+  if (mark >= 70) return { grade: 'b',  remark: 'Very Good',        cls: 'rc-rem-2' };
+  if (mark >= 60) return { grade: 'c',  remark: 'Good',             cls: 'rc-rem-3' };
+  if (mark >= 50) return { grade: 'd',  remark: 'Average',          cls: 'rc-rem-4' };
+  if (mark >= 40) return { grade: 'e',  remark: 'Needs Improv.',    cls: 'rc-rem-5' };
+  if (mark >= 30) return { grade: 'u*', remark: 'Unsatisfactory',   cls: 'rc-rem-6' };
+  return           { grade: 'u',  remark: 'Ungraded',               cls: 'rc-rem-7' };
 }
 
 function upperGradeInfo(code, grade, numMark) {
   var max = getMaxMark(code, grade) || 100;
-  return {
-    grade: max === 200 ? upperMainGrade(numMark) : upperSubGrade(numMark),
-    remark: '—',
-    cls: ''
-  };
+  return max === 200 ? upperMainGradeInfo(numMark) : upperSubGradeInfo(numMark);
 }
 
 function renderReportCardRow(cardEl, student, idx) {
