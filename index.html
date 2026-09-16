@@ -481,13 +481,11 @@ var GRADE_CONFIG = {
       { label: 'FPLNS',  tab: 'G8 FPLNS', fplns: true }
     ]
   },
+  // Term 3: G9 is FPLNS only (no Red/Blue/Yellow). G11 and G13 not offered.
   'G9': {
     spreadsheetId: SPREADSHEET_G9,
     classes: [
-      { label: 'Red',    tab: 'G9 Red'    },
-      { label: 'Blue',   tab: 'G9 Blue'   },
-      { label: 'Yellow', tab: 'G9 Yellow' },
-      { label: 'FPLNS',  tab: 'G9 FPLNS', fplns: true }
+      { label: 'FPLNS', tab: 'G9 FPLNS', fplns: true }
     ]
   },
   'G10': {
@@ -499,27 +497,11 @@ var GRADE_CONFIG = {
       { label: 'ST',   tab: 'G10 ST'   }
     ]
   },
-  'G11': {
-    spreadsheetId: SPREADSHEET_G10G11,
-    classes: [
-      { label: 'Art',  tab: 'G11 Art'  },
-      { label: 'Eco1', tab: 'G11 Eco1' },
-      { label: 'Eco2', tab: 'G11 Eco2' },
-      { label: 'ST',   tab: 'G11 ST'   }
-    ]
-  },
   'G12': {
     spreadsheetId: SPREADSHEET_G12G13,
     classes: [
       { label: 'Eco', tab: 'G12 Eco' },
       { label: 'ST',  tab: 'G12 ST'  }
-    ]
-  },
-  'G13': {
-    spreadsheetId: SPREADSHEET_G12G13,
-    classes: [
-      { label: 'Eco', tab: 'G13 Eco' },
-      { label: 'ST',  tab: 'G13 ST'  }
     ]
   }
 };

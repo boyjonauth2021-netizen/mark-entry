@@ -266,7 +266,7 @@
       <div class="title-row">
         <div>
           <h1>Report Sheet Generator</h1>
-          <div class="subtitle" id="welcome-text">Term 2 final reports</div>
+          <div class="subtitle" id="welcome-text">Term 3 final reports</div>
         </div>
         <button class="icon-btn" onclick="signOut()" title="Sign out">&#x2715;</button>
       </div>
@@ -300,10 +300,10 @@ var tokenClient = null;
 var signingIn = false;
 
 var SPREADSHEET_G7G8   = '1xZWPBK2CD0KwT2JAJubl5J7skHO3rZDX8F8Cs5_o4Dw';
-var SPREADSHEET_G9     = '1-4pkmA_7B1dVgK_nF9sXB5Ch00EPRA97NWk2hx1APn8';
 var SPREADSHEET_G10G11 = '1WdXJom9i_a0JA3OadNn5HraZvfrO-lETBydYNdQBfL0';
 var SPREADSHEET_G12G13 = '1y0SjWbd0mMpP5AHYYe1KJa0ej6Z0K-_xeN3cnQhoK6A';
 
+// Term 3: G7, G8, G10, G12 only (no G9 / G11 / G13). Literacy reports use the separate generator.
 var GRADE_CONFIG = {
   'G7': {
     spreadsheetId: SPREADSHEET_G7G8,
@@ -321,14 +321,6 @@ var GRADE_CONFIG = {
       { label: 'Yellow', tab: 'G8 Yellow' }
     ]
   },
-  'G9': {
-    spreadsheetId: SPREADSHEET_G9,
-    classes: [
-      { label: 'Red',    tab: 'G9 Red'    },
-      { label: 'Blue',   tab: 'G9 Blue'   },
-      { label: 'Yellow', tab: 'G9 Yellow' }
-    ]
-  },
   'G10': {
     spreadsheetId: SPREADSHEET_G10G11,
     classes: [
@@ -338,27 +330,11 @@ var GRADE_CONFIG = {
       { label: 'ST',   tab: 'G10 ST'   }
     ]
   },
-  'G11': {
-    spreadsheetId: SPREADSHEET_G10G11,
-    classes: [
-      { label: 'Art',  tab: 'G11 Art'  },
-      { label: 'Eco1', tab: 'G11 Eco1' },
-      { label: 'Eco2', tab: 'G11 Eco2' },
-      { label: 'ST',   tab: 'G11 ST'   }
-    ]
-  },
   'G12': {
     spreadsheetId: SPREADSHEET_G12G13,
     classes: [
       { label: 'Eco', tab: 'G12 Eco' },
       { label: 'ST',  tab: 'G12 ST'  }
-    ]
-  },
-  'G13': {
-    spreadsheetId: SPREADSHEET_G12G13,
-    classes: [
-      { label: 'Eco', tab: 'G13 Eco' },
-      { label: 'ST',  tab: 'G13 ST'  }
     ]
   }
 };
