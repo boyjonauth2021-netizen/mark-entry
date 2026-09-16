@@ -265,8 +265,23 @@
   .profile-item-teacher { font-size: 12px; color: var(--muted); margin-top: 6px; }
   .profile-item-media { padding: 10px; background: #fff; text-align: center; }
   .profile-item-media img {
-    max-width: 100%; height: auto; border-radius: 10px;
-    border: 1px solid var(--border);
+    max-width: 100%; height: auto; max-height: 320px; object-fit: contain;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: #f7f7f9; cursor: pointer;
+  }
+  .profile-thumb-wrap {
+    min-height: 140px; display: flex; align-items: center; justify-content: center;
+  }
+  .profile-thumb-loading {
+    font-size: 13px; color: var(--muted); padding: 24px 8px;
+  }
+  .profile-pick-row {
+    display: flex; flex-direction: column; gap: 10px; margin-top: 4px;
+  }
+  .profile-pick-row .btn-profile-action { margin-bottom: 0; }
+  .profile-preview-img {
+    margin-top: 12px; max-width: 100%; max-height: 180px; border-radius: 10px;
+    border: 1px solid var(--border); object-fit: contain; background: #fff;
   }
   .profile-pdf-link {
     display: inline-block; padding: 14px 18px; margin: 8px 0;
@@ -520,11 +535,18 @@
         <div class="mark-header-sub" id="fplns-profile-upload-sub"></div>
       </div>
       <div class="profile-upload-box" id="fplns-upload-box">
-        <div style="font-size:15px;font-weight:700;margin-bottom:8px">Choose photo or PDF</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">From your phone gallery or files (max 8 MB)</div>
-        <button type="button" class="btn-profile-action primary" style="max-width:280px;margin:0 auto" onclick="document.getElementById('fplns-file-input').click()">Upload picture / PDF</button>
-        <input type="file" id="fplns-file-input" accept="image/*,application/pdf" style="display:none" onchange="onFplnsProfileFileSelected(this)">
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px">Add student work</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Photos are compressed automatically for faster upload. PDF max 8 MB.</div>
+        <div class="profile-pick-row">
+          <button type="button" class="btn-profile-action primary" onclick="document.getElementById('fplns-camera-input').click()">Take photo</button>
+          <button type="button" class="btn-profile-action" onclick="document.getElementById('fplns-gallery-input').click()">Choose from gallery</button>
+          <button type="button" class="btn-profile-action" onclick="document.getElementById('fplns-pdf-input').click()">Choose PDF</button>
+        </div>
+        <input type="file" id="fplns-camera-input" accept="image/*" capture="environment" style="display:none" onchange="onFplnsProfileFileSelected(this)">
+        <input type="file" id="fplns-gallery-input" accept="image/*" style="display:none" onchange="onFplnsProfileFileSelected(this)">
+        <input type="file" id="fplns-pdf-input" accept="application/pdf" style="display:none" onchange="onFplnsProfileFileSelected(this)">
         <div class="profile-file-name" id="fplns-file-name"></div>
+        <img id="fplns-local-preview" class="profile-preview-img" alt="" style="display:none">
       </div>
       <div class="profile-desc-label">Description (optional)</div>
       <textarea class="profile-desc-input" id="fplns-profile-desc" placeholder="Label for this work (e.g. Worksheet page 3)"></textarea>
@@ -1221,6 +1243,8 @@ function renderFplnsStudentRows(students) {
 
 // ── FPLNS student profile (photos/PDFs per student + skill) ───
 var FPLNS_PROFILE_MAX_BYTES = 8 * 1024 * 1024;
+var FPLNS_IMAGE_MAX_DIM = 1280;
+var FPLNS_IMAGE_QUALITY = 0.72;
 
 function openFplnsProfileMenu(studentIdx) {
   if (!state.isFplns || !state.subject || state.subject.type !== 'fplns') return;
@@ -1233,12 +1257,19 @@ function openFplnsProfileMenu(studentIdx) {
 
 function resetFplnsProfileUploadForm() {
   state.profilePendingFile = null;
-  var input = document.getElementById('fplns-file-input');
-  if (input) input.value = '';
+  ['fplns-camera-input', 'fplns-gallery-input', 'fplns-pdf-input'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   var box = document.getElementById('fplns-upload-box');
   if (box) box.classList.remove('has-file');
   document.getElementById('fplns-file-name').textContent = '';
   document.getElementById('fplns-profile-desc').value = '';
+  var preview = document.getElementById('fplns-local-preview');
+  if (preview) {
+    preview.style.display = 'none';
+    preview.removeAttribute('src');
+  }
   var btn = document.getElementById('btn-fplns-upload');
   if (btn) { btn.disabled = true; btn.textContent = 'Save to Profile'; }
 }
@@ -1261,6 +1292,101 @@ function goFplnsProfileView() {
   loadFplnsProfileView();
 }
 
+function setFplnsPendingFile(file, statusText) {
+  state.profilePendingFile = file;
+  document.getElementById('fplns-upload-box').classList.add('has-file');
+  document.getElementById('fplns-file-name').textContent = statusText || file.name;
+  document.getElementById('btn-fplns-upload').disabled = false;
+
+  var preview = document.getElementById('fplns-local-preview');
+  if (file.type && file.type.indexOf('image/') === 0) {
+    var url = URL.createObjectURL(file);
+    preview.onload = function() { URL.revokeObjectURL(url); };
+    preview.src = url;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+    preview.removeAttribute('src');
+  }
+}
+
+function makeNamedFile(blobOrFile, fileName, mimeType) {
+  try {
+    return new File([blobOrFile], fileName, { type: mimeType || blobOrFile.type || 'application/octet-stream' });
+  } catch (err) {
+    // Older WebViews may lack File constructor
+    var b = blobOrFile instanceof Blob ? blobOrFile : new Blob([blobOrFile], { type: mimeType });
+    b.name = fileName;
+    b.lastModified = Date.now();
+    return b;
+  }
+}
+
+function compressImageFile(file, cb) {
+  if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+    cb(file, false);
+    return;
+  }
+  // Skip tiny images
+  if (file.size < 180 * 1024) {
+    cb(file, false);
+    return;
+  }
+
+  var objectUrl = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function() {
+    try {
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      var scale = Math.min(1, FPLNS_IMAGE_MAX_DIM / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale));
+      var ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      URL.revokeObjectURL(objectUrl);
+
+      var finishWithBlob = function(blob) {
+        if (!blob) {
+          cb(file, false);
+          return;
+        }
+        if (blob.size >= file.size * 0.95) {
+          cb(file, false);
+          return;
+        }
+        var outName = String(file.name || 'photo.jpg').replace(/\.[^.]+$/, '') + '.jpg';
+        cb(makeNamedFile(blob, outName, 'image/jpeg'), true);
+      };
+
+      if (!canvas.toBlob) {
+        var dataUrl = canvas.toDataURL('image/jpeg', FPLNS_IMAGE_QUALITY);
+        var b64 = dataUrl.split(',')[1] || '';
+        var bin = atob(b64);
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        finishWithBlob(new Blob([arr], { type: 'image/jpeg' }));
+        return;
+      }
+
+      canvas.toBlob(finishWithBlob, 'image/jpeg', FPLNS_IMAGE_QUALITY);
+    } catch (err) {
+      URL.revokeObjectURL(objectUrl);
+      cb(file, false);
+    }
+  };
+  img.onerror = function() {
+    URL.revokeObjectURL(objectUrl);
+    cb(file, false);
+  };
+  img.src = objectUrl;
+}
+
 function onFplnsProfileFileSelected(input) {
   var file = input.files && input.files[0];
   if (!file) return;
@@ -1278,10 +1404,18 @@ function onFplnsProfileFileSelected(input) {
     return;
   }
 
-  state.profilePendingFile = file;
-  document.getElementById('fplns-upload-box').classList.add('has-file');
-  document.getElementById('fplns-file-name').textContent = file.name;
-  document.getElementById('btn-fplns-upload').disabled = false;
+  if (isPdf) {
+    setFplnsPendingFile(file, file.name);
+    return;
+  }
+
+  document.getElementById('fplns-file-name').textContent = 'Compressing photo…';
+  document.getElementById('btn-fplns-upload').disabled = true;
+  compressImageFile(file, function(outFile, didCompress) {
+    var kb = Math.round(outFile.size / 1024);
+    var label = outFile.name + ' · ' + kb + ' KB' + (didCompress ? ' (compressed)' : '');
+    setFplnsPendingFile(outFile, label);
+  });
 }
 
 function readFileAsBase64(file, cb) {
@@ -1337,8 +1471,8 @@ function uploadFplnsProfile() {
         skillCode: state.subject.code,
         studentName: state.profileStudent.name,
         description: document.getElementById('fplns-profile-desc').value.trim(),
-        mimeType: file.type || (file.name.match(/\.pdf$/i) ? 'application/pdf' : 'image/jpeg'),
-        extension: fileExtensionFromName(file.name, file.type),
+        mimeType: file.type || (/\.pdf$/i.test(file.name || '') ? 'application/pdf' : 'image/jpeg'),
+        extension: fileExtensionFromName(file.name || file._name || 'photo.jpg', file.type),
         fileBase64: b64
       })
     })
@@ -1391,6 +1525,44 @@ function loadFplnsProfileView() {
   });
 }
 
+function loadFplnsProfileThumb(imgEl, fileId) {
+  if (!imgEl || !fileId || !state.profileStudent || !state.subject) return;
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'fplnsProfileImage',
+      token: accessToken,
+      spreadsheetId: state.spreadsheetId,
+      grade: state.grade,
+      classLabel: state.classLabel,
+      tab: state.tabName,
+      skillName: state.subject.name,
+      skillCode: state.subject.code,
+      studentName: state.profileStudent.name,
+      fileId: fileId
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (data.error || !data.dataBase64) {
+      imgEl.alt = 'Preview unavailable';
+      imgEl.style.display = 'none';
+      var wrap = imgEl.parentElement;
+      if (wrap) {
+        var msg = document.createElement('div');
+        msg.className = 'profile-thumb-loading';
+        msg.textContent = 'Preview unavailable — tap Open to view';
+        wrap.appendChild(msg);
+      }
+      return;
+    }
+    imgEl.src = 'data:' + (data.mimeType || 'image/jpeg') + ';base64,' + data.dataBase64;
+  })
+  .catch(function() {
+    imgEl.style.display = 'none';
+  });
+}
+
 function renderFplnsProfileTimeline(items) {
   var container = document.getElementById('fplns-profile-timeline');
   if (!items.length) {
@@ -1417,8 +1589,11 @@ function renderFplnsProfileTimeline(items) {
         '<a class="profile-pdf-link" href="' + escapeAttr(item.viewUrl) + '" target="_blank" rel="noopener">Open PDF</a>';
     } else {
       mediaHtml =
-        '<img src="' + escapeAttr(item.imageUrl) + '" alt="Student work" loading="lazy" ' +
-        'onclick="window.open(\'' + escapeAttr(item.viewUrl) + '\', \'_blank\')">';
+        '<div class="profile-thumb-wrap">' +
+          '<div class="profile-thumb-loading">Loading preview…</div>' +
+          '<img alt="Student work" loading="lazy" style="display:none" data-file-id="' + escapeAttr(item.fileId) + '">' +
+        '</div>' +
+        '<a class="profile-pdf-link" href="' + escapeAttr(item.viewUrl) + '" target="_blank" rel="noopener">Open full size</a>';
     }
 
     block.innerHTML =
@@ -1430,6 +1605,32 @@ function renderFplnsProfileTimeline(items) {
       '<div class="profile-item-media">' + mediaHtml + '</div>';
 
     container.appendChild(block);
+
+    if (!item.isPdf) {
+      var img = block.querySelector('img[data-file-id]');
+      var loading = block.querySelector('.profile-thumb-loading');
+      if (img) {
+        // Try Drive thumbnail first (fast), fall back to Apps Script proxy
+        var thumbUrl = item.thumbnailUrl || item.imageUrl ||
+          ('https://drive.google.com/thumbnail?id=' + item.fileId + '&sz=w800');
+        img.onload = function() {
+          img.style.display = 'block';
+          if (loading) loading.style.display = 'none';
+        };
+        img.onerror = function() {
+          img.onerror = null;
+          loadFplnsProfileThumb(img, item.fileId);
+          img.onload = function() {
+            img.style.display = 'block';
+            if (loading) loading.style.display = 'none';
+          };
+        };
+        img.onclick = function() {
+          window.open(item.viewUrl, '_blank');
+        };
+        img.src = thumbUrl;
+      }
+    }
   });
 }
 
