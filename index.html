@@ -742,7 +742,8 @@ var state = {
   profile: null,
   isFplns: false,
   profileStudent: null,
-  profilePendingFile: null
+  profilePendingFile: null,
+  profilePendingThumbBase64: ''
 };
 var tokenClient;
 
@@ -1243,8 +1244,10 @@ function renderFplnsStudentRows(students) {
 
 // ── FPLNS student profile (photos/PDFs per student + skill) ───
 var FPLNS_PROFILE_MAX_BYTES = 8 * 1024 * 1024;
-var FPLNS_IMAGE_MAX_DIM = 1280;
-var FPLNS_IMAGE_QUALITY = 0.72;
+var FPLNS_IMAGE_MAX_DIM = 800;
+var FPLNS_IMAGE_QUALITY = 0.65;
+var FPLNS_THUMB_MAX_DIM = 420;
+var FPLNS_THUMB_QUALITY = 0.55;
 
 function openFplnsProfileMenu(studentIdx) {
   if (!state.isFplns || !state.subject || state.subject.type !== 'fplns') return;
@@ -1257,6 +1260,7 @@ function openFplnsProfileMenu(studentIdx) {
 
 function resetFplnsProfileUploadForm() {
   state.profilePendingFile = null;
+  state.profilePendingThumbBase64 = '';
   ['fplns-camera-input', 'fplns-gallery-input', 'fplns-pdf-input'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
@@ -1292,8 +1296,9 @@ function goFplnsProfileView() {
   loadFplnsProfileView();
 }
 
-function setFplnsPendingFile(file, statusText) {
+function setFplnsPendingFile(file, statusText, thumbBase64) {
   state.profilePendingFile = file;
+  state.profilePendingThumbBase64 = thumbBase64 || '';
   document.getElementById('fplns-upload-box').classList.add('has-file');
   document.getElementById('fplns-file-name').textContent = statusText || file.name;
   document.getElementById('btn-fplns-upload').disabled = false;
@@ -1314,7 +1319,6 @@ function makeNamedFile(blobOrFile, fileName, mimeType) {
   try {
     return new File([blobOrFile], fileName, { type: mimeType || blobOrFile.type || 'application/octet-stream' });
   } catch (err) {
-    // Older WebViews may lack File constructor
     var b = blobOrFile instanceof Blob ? blobOrFile : new Blob([blobOrFile], { type: mimeType });
     b.name = fileName;
     b.lastModified = Date.now();
@@ -1322,24 +1326,29 @@ function makeNamedFile(blobOrFile, fileName, mimeType) {
   }
 }
 
-function compressImageFile(file, cb) {
-  if (!file || !file.type || file.type.indexOf('image/') !== 0) {
-    cb(file, false);
-    return;
-  }
-  // Skip tiny images
-  if (file.size < 180 * 1024) {
-    cb(file, false);
-    return;
-  }
+function blobToBase64(blob, cb) {
+  var reader = new FileReader();
+  reader.onload = function() {
+    var result = reader.result || '';
+    var comma = result.indexOf(',');
+    cb(comma >= 0 ? result.substring(comma + 1) : result);
+  };
+  reader.onerror = function() { cb(''); };
+  reader.readAsDataURL(blob);
+}
 
+function resizeImageToJpegBlob(file, maxDim, quality, cb) {
+  if (!file || !(file.type && file.type.indexOf('image/') === 0)) {
+    cb(null);
+    return;
+  }
   var objectUrl = URL.createObjectURL(file);
   var img = new Image();
   img.onload = function() {
     try {
       var w = img.naturalWidth || img.width;
       var h = img.naturalHeight || img.height;
-      var scale = Math.min(1, FPLNS_IMAGE_MAX_DIM / Math.max(w, h));
+      var scale = Math.min(1, maxDim / Math.max(w, h));
       var cw = Math.max(1, Math.round(w * scale));
       var ch = Math.max(1, Math.round(h * scale));
       var canvas = document.createElement('canvas');
@@ -1351,40 +1360,49 @@ function compressImageFile(file, cb) {
       ctx.drawImage(img, 0, 0, cw, ch);
       URL.revokeObjectURL(objectUrl);
 
-      var finishWithBlob = function(blob) {
-        if (!blob) {
-          cb(file, false);
-          return;
-        }
-        if (blob.size >= file.size * 0.95) {
-          cb(file, false);
-          return;
-        }
-        var outName = String(file.name || 'photo.jpg').replace(/\.[^.]+$/, '') + '.jpg';
-        cb(makeNamedFile(blob, outName, 'image/jpeg'), true);
-      };
-
+      var done = function(blob) { cb(blob || null); };
       if (!canvas.toBlob) {
-        var dataUrl = canvas.toDataURL('image/jpeg', FPLNS_IMAGE_QUALITY);
+        var dataUrl = canvas.toDataURL('image/jpeg', quality);
         var b64 = dataUrl.split(',')[1] || '';
         var bin = atob(b64);
         var arr = new Uint8Array(bin.length);
         for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        finishWithBlob(new Blob([arr], { type: 'image/jpeg' }));
+        done(new Blob([arr], { type: 'image/jpeg' }));
         return;
       }
-
-      canvas.toBlob(finishWithBlob, 'image/jpeg', FPLNS_IMAGE_QUALITY);
+      canvas.toBlob(done, 'image/jpeg', quality);
     } catch (err) {
       URL.revokeObjectURL(objectUrl);
-      cb(file, false);
+      cb(null);
     }
   };
   img.onerror = function() {
     URL.revokeObjectURL(objectUrl);
-    cb(file, false);
+    cb(null);
   };
   img.src = objectUrl;
+}
+
+function prepareFplnsImageForUpload(file, cb) {
+  // Main compressed photo + tiny thumb for fast Show Profile
+  resizeImageToJpegBlob(file, FPLNS_IMAGE_MAX_DIM, FPLNS_IMAGE_QUALITY, function(mainBlob) {
+    var mainFile = file;
+    var didCompress = false;
+    if (mainBlob && mainBlob.size < file.size * 0.95) {
+      var outName = String(file.name || 'photo.jpg').replace(/\.[^.]+$/, '') + '.jpg';
+      mainFile = makeNamedFile(mainBlob, outName, 'image/jpeg');
+      didCompress = true;
+    }
+    resizeImageToJpegBlob(file, FPLNS_THUMB_MAX_DIM, FPLNS_THUMB_QUALITY, function(thumbBlob) {
+      if (!thumbBlob) {
+        cb(mainFile, didCompress, '');
+        return;
+      }
+      blobToBase64(thumbBlob, function(thumbB64) {
+        cb(mainFile, didCompress, thumbB64 || '');
+      });
+    });
+  });
 }
 
 function onFplnsProfileFileSelected(input) {
@@ -1405,28 +1423,21 @@ function onFplnsProfileFileSelected(input) {
   }
 
   if (isPdf) {
-    setFplnsPendingFile(file, file.name);
+    setFplnsPendingFile(file, file.name, '');
     return;
   }
 
   document.getElementById('fplns-file-name').textContent = 'Compressing photo…';
   document.getElementById('btn-fplns-upload').disabled = true;
-  compressImageFile(file, function(outFile, didCompress) {
+  prepareFplnsImageForUpload(file, function(outFile, didCompress, thumbB64) {
     var kb = Math.round(outFile.size / 1024);
     var label = outFile.name + ' · ' + kb + ' KB' + (didCompress ? ' (compressed)' : '');
-    setFplnsPendingFile(outFile, label);
+    setFplnsPendingFile(outFile, label, thumbB64);
   });
 }
 
 function readFileAsBase64(file, cb) {
-  var reader = new FileReader();
-  reader.onload = function() {
-    var result = reader.result || '';
-    var comma = result.indexOf(',');
-    cb(comma >= 0 ? result.substring(comma + 1) : result);
-  };
-  reader.onerror = function() { cb(null); };
-  reader.readAsDataURL(file);
+  blobToBase64(file, cb);
 }
 
 function fileExtensionFromName(name, mimeType) {
@@ -1450,6 +1461,7 @@ function uploadFplnsProfile() {
   btn.textContent = 'Uploading...';
 
   var file = state.profilePendingFile;
+  var thumbB64 = state.profilePendingThumbBase64 || '';
   readFileAsBase64(file, function(b64) {
     if (!b64) {
       btn.disabled = false;
@@ -1473,7 +1485,8 @@ function uploadFplnsProfile() {
         description: document.getElementById('fplns-profile-desc').value.trim(),
         mimeType: file.type || (/\.pdf$/i.test(file.name || '') ? 'application/pdf' : 'image/jpeg'),
         extension: fileExtensionFromName(file.name || file._name || 'photo.jpg', file.type),
-        fileBase64: b64
+        fileBase64: b64,
+        thumbnailBase64: thumbB64
       })
     })
     .then(function(r){ return r.json(); })
@@ -1525,7 +1538,16 @@ function loadFplnsProfileView() {
   });
 }
 
-function loadFplnsProfileThumb(imgEl, fileId) {
+function showFplnsThumb(imgEl, loadingEl, dataUrl) {
+  if (!imgEl) return;
+  imgEl.onload = function() {
+    imgEl.style.display = 'block';
+    if (loadingEl) loadingEl.style.display = 'none';
+  };
+  imgEl.src = dataUrl;
+}
+
+function loadFplnsProfileThumb(imgEl, fileId, loadingEl) {
   if (!imgEl || !fileId || !state.profileStudent || !state.subject) return;
   fetch(SCRIPT_URL, {
     method: 'POST',
@@ -1547,19 +1569,14 @@ function loadFplnsProfileThumb(imgEl, fileId) {
     if (data.error || !data.dataBase64) {
       imgEl.alt = 'Preview unavailable';
       imgEl.style.display = 'none';
-      var wrap = imgEl.parentElement;
-      if (wrap) {
-        var msg = document.createElement('div');
-        msg.className = 'profile-thumb-loading';
-        msg.textContent = 'Preview unavailable — tap Open to view';
-        wrap.appendChild(msg);
-      }
+      if (loadingEl) loadingEl.textContent = 'Preview unavailable — tap Open full size';
       return;
     }
-    imgEl.src = 'data:' + (data.mimeType || 'image/jpeg') + ';base64,' + data.dataBase64;
+    showFplnsThumb(imgEl, loadingEl, 'data:' + (data.mimeType || 'image/jpeg') + ';base64,' + data.dataBase64);
   })
   .catch(function() {
     imgEl.style.display = 'none';
+    if (loadingEl) loadingEl.textContent = 'Preview unavailable — tap Open full size';
   });
 }
 
@@ -1609,27 +1626,36 @@ function renderFplnsProfileTimeline(items) {
     if (!item.isPdf) {
       var img = block.querySelector('img[data-file-id]');
       var loading = block.querySelector('.profile-thumb-loading');
-      if (img) {
-        // Try Drive thumbnail first (fast), fall back to Apps Script proxy
-        var thumbUrl = item.thumbnailUrl || item.imageUrl ||
-          ('https://drive.google.com/thumbnail?id=' + item.fileId + '&sz=w800');
-        img.onload = function() {
-          img.style.display = 'block';
-          if (loading) loading.style.display = 'none';
-        };
-        img.onerror = function() {
-          img.onerror = null;
-          loadFplnsProfileThumb(img, item.fileId);
-          img.onload = function() {
-            img.style.display = 'block';
-            if (loading) loading.style.display = 'none';
-          };
-        };
-        img.onclick = function() {
-          window.open(item.viewUrl, '_blank');
-        };
-        img.src = thumbUrl;
+      if (!img) return;
+
+      img.onclick = function() {
+        window.open(item.viewUrl, '_blank');
+      };
+
+      // Fast path: thumbnail already embedded in list response
+      if (item.thumbBase64) {
+        showFplnsThumb(img, loading, 'data:image/jpeg;base64,' + item.thumbBase64);
+        return;
       }
+
+      // Next: load small thumb file via Apps Script
+      if (item.thumbFileId) {
+        loadFplnsProfileThumb(img, item.thumbFileId, loading);
+        return;
+      }
+
+      // Legacy uploads (no thumb yet): try Drive thumbnail, then full file
+      var thumbUrl = item.thumbnailUrl || item.imageUrl ||
+        ('https://drive.google.com/thumbnail?id=' + item.fileId + '&sz=w400');
+      img.onload = function() {
+        img.style.display = 'block';
+        if (loading) loading.style.display = 'none';
+      };
+      img.onerror = function() {
+        img.onerror = null;
+        loadFplnsProfileThumb(img, item.fileId, loading);
+      };
+      img.src = thumbUrl;
     }
   });
 }
