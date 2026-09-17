@@ -1307,7 +1307,7 @@ function goFplnsProfileView() {
   document.getElementById('fplns-profile-view-sub').textContent =
     state.profileStudent.name + ' · ' + state.subject.name;
   document.getElementById('fplns-profile-timeline').innerHTML =
-    '<div class="loading"><div class="spinner"></div>Building preview PDF (240px photos)…</div>';
+    '<div class="loading"><div class="spinner"></div>Building profile PDF (photos at 400px)…</div>';
   goTo('fplns-profile-view');
   loadFplnsProfilePdfPreview();
 }
@@ -1573,7 +1573,7 @@ function renderFplnsProfilePdfPreview(data) {
     '</div>' +
     '<p class="profile-pdf-note">' +
       escapeHtml(data.fileName || 'Profile.pdf') + ' · ' + count + ' item' + (count === 1 ? '' : 's') +
-      '. Photos use 240px preview thumbs for speed. Full-size files stay in Drive.' +
+      '. Photos are shown at 400px in this PDF.' +
     '</p>';
 
   var shareEl = document.getElementById('btn-fplns-pdf-share');
