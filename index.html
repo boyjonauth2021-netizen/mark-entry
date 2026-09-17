@@ -225,6 +225,8 @@
     border-radius: 16px; border: 2px solid var(--border);
     background: var(--card); font-size: 17px; font-weight: 700;
     cursor: pointer; touch-action: manipulation; font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none; color: inherit; box-sizing: border-box;
   }
   .btn-profile-action.primary {
     background: #8e44ad; border-color: #8e44ad; color: #fff;
@@ -287,6 +289,20 @@
     display: inline-block; padding: 14px 18px; margin: 8px 0;
     background: #eef4ff; color: #1a56db; border-radius: 12px;
     font-weight: 700; text-decoration: none; font-size: 15px;
+  }
+  .profile-pdf-actions {
+    display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;
+  }
+  .profile-pdf-frame-wrap {
+    border: 2px solid var(--border); border-radius: 14px; overflow: hidden;
+    background: #f7f7f9; min-height: 420px;
+  }
+  .profile-pdf-frame {
+    width: 100%; height: 62vh; min-height: 420px; border: 0; display: block;
+    background: #fff;
+  }
+  .profile-pdf-note {
+    font-size: 13px; color: var(--muted); margin: 10px 0 0; line-height: 1.4;
   }
   .profile-empty {
     text-align: center; color: var(--muted); padding: 40px 16px;
@@ -523,7 +539,7 @@
         <div class="profile-menu-title" id="fplns-profile-menu-student"></div>
         <div class="profile-menu-sub"><span id="fplns-profile-menu-skill"></span></div>
         <button class="btn-profile-action primary" onclick="goFplnsProfileUpload()">Update Profile</button>
-        <button class="btn-profile-action" onclick="goFplnsProfileView()">Show Profile of Student</button>
+        <button class="btn-profile-action" onclick="goFplnsProfileView()">Show Profile PDF</button>
       </div>
     </div>
 
@@ -553,11 +569,11 @@
       <button type="button" class="btn-profile-action primary" id="btn-fplns-upload" onclick="uploadFplnsProfile()" disabled style="margin-top:18px">Save to Profile</button>
     </div>
 
-    <!-- FPLNS Profile: view -->
+    <!-- FPLNS Profile: view (PDF preview) -->
     <div class="screen" id="screen-fplns-profile-view">
       <button class="btn-back" onclick="goTo('fplns-profile-menu')">← Back</button>
       <div class="mark-header">
-        <div class="mark-header-title">Student Profile</div>
+        <div class="mark-header-title">Profile PDF Preview</div>
         <div class="mark-header-sub" id="fplns-profile-view-sub"></div>
       </div>
       <div id="fplns-profile-timeline" class="profile-timeline"></div>
@@ -1291,9 +1307,9 @@ function goFplnsProfileView() {
   document.getElementById('fplns-profile-view-sub').textContent =
     state.profileStudent.name + ' · ' + state.subject.name;
   document.getElementById('fplns-profile-timeline').innerHTML =
-    '<div class="loading"><div class="spinner"></div>Loading profile...</div>';
+    '<div class="loading"><div class="spinner"></div>Building preview PDF (240px photos)…</div>';
   goTo('fplns-profile-view');
-  loadFplnsProfileView();
+  loadFplnsProfilePdfPreview();
 }
 
 function setFplnsPendingFile(file, statusText, thumbBase64) {
@@ -1509,12 +1525,12 @@ function uploadFplnsProfile() {
   });
 }
 
-function loadFplnsProfileView() {
+function loadFplnsProfilePdfPreview() {
   var container = document.getElementById('fplns-profile-timeline');
   fetch(SCRIPT_URL, {
     method: 'POST',
     body: JSON.stringify({
-      action: 'fplnsProfileList',
+      action: 'fplnsProfilePdf',
       token: accessToken,
       spreadsheetId: state.spreadsheetId,
       grade: state.grade,
@@ -1531,11 +1547,49 @@ function loadFplnsProfileView() {
       container.innerHTML = '<div class="profile-empty">Error: ' + escapeHtml(data.error) + '</div>';
       return;
     }
-    renderFplnsProfileTimeline(data.items || []);
+    renderFplnsProfilePdfPreview(data);
   })
   .catch(function() {
-    container.innerHTML = '<div class="profile-empty">Failed to load profile.</div>';
+    container.innerHTML = '<div class="profile-empty">Failed to build profile PDF. Try again.</div>';
   });
+}
+
+function renderFplnsProfilePdfPreview(data) {
+  var container = document.getElementById('fplns-profile-timeline');
+  var previewUrl = data.previewUrl || data.fileUrl;
+  var fileUrl = data.fileUrl || previewUrl;
+  var count = typeof data.itemCount === 'number' ? data.itemCount : 0;
+  var shareBtn = (typeof navigator !== 'undefined' && navigator.share)
+    ? '<button type="button" class="btn-profile-action" id="btn-fplns-pdf-share">Share PDF link</button>'
+    : '';
+
+  container.innerHTML =
+    '<div class="profile-pdf-actions">' +
+      '<a class="btn-profile-action primary" href="' + escapeAttr(fileUrl) + '" target="_blank" rel="noopener">Open / Save PDF</a>' +
+      shareBtn +
+    '</div>' +
+    '<div class="profile-pdf-frame-wrap">' +
+      '<iframe class="profile-pdf-frame" title="Profile PDF preview" src="' + escapeAttr(previewUrl) + '"></iframe>' +
+    '</div>' +
+    '<p class="profile-pdf-note">' +
+      escapeHtml(data.fileName || 'Profile.pdf') + ' · ' + count + ' item' + (count === 1 ? '' : 's') +
+      '. Photos use 240px preview thumbs for speed. Full-size files stay in Drive.' +
+    '</p>';
+
+  var shareEl = document.getElementById('btn-fplns-pdf-share');
+  if (shareEl) {
+    shareEl.onclick = function() {
+      navigator.share({
+        title: data.fileName || 'Student profile',
+        text: (state.profileStudent && state.profileStudent.name ? state.profileStudent.name + ' profile' : 'Student profile'),
+        url: fileUrl
+      }).catch(function() {});
+    };
+  }
+}
+
+function loadFplnsProfileView() {
+  loadFplnsProfilePdfPreview();
 }
 
 function showFplnsThumb(imgEl, loadingEl, dataUrl) {
